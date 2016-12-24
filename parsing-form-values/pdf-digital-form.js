@@ -119,7 +119,7 @@ function parseOpts(pdfParser, fieldDictionary) {
 function parseChoiceValue(pdfParser, fieldDictionary) {
 	if(fieldDictionary.exists('V')) {
 		// might be either text or array of texts
-		var valueField = pdfParser.queryDictionaryObject(fieldDictionary,fieldName);
+		var valueField = pdfParser.queryDictionaryObject(fieldDictionary,"V");
 		if(valueField.getType() == hummus.ePDFObjectLiteralString) {
 			// text string. read into value
 			return valueField.toPDFLiteralString().toText();
