@@ -9,7 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "hummus": "^1.0.67",
+    "hummus": "^1.0.68",
     "lodash": "^4.17.2"
   }
 }

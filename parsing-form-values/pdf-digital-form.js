@@ -6,6 +6,18 @@
 var _ = require('lodash'),
     hummus = require('hummus');
 
+function toText(item) {
+    if(item.getType() === hummus.ePDFObjectLiteralString) {
+        return item.toPDFLiteralString().toText();
+    }
+    else if(item.getType() === hummus.ePDFObjectHexString) {
+        return item.toPDFHexString().toText();
+    } else {
+        console.log('else')
+        return item.value;
+    }
+}
+
 function parseForAcroformObject(pdfParser) {
     catalogDict = pdfParser.queryDictionaryObject(pdfParser.getTrailer(),'Root').toPDFDictionary(),
     acroformDict = catalogDict.exists('AcroForm') ? pdfParser.queryDictionaryObject(catalogDict,'AcroForm'):null;
@@ -22,7 +34,7 @@ function parseKids(pdfParser,fieldDictionary,inheritedProperties,baseFieldName) 
     if(fieldDictionary.exists('Ff'))
         localEnv['Ff'] = fieldDictionary.queryObject('Ff').toNumber();
     if(fieldDictionary.exists('DA'))
-        localEnv['DA'] = fieldDictionary.queryObject('DA').toPDFLiteralString().toText();
+        localEnv['DA'] = toText(fieldDictionary.queryObject('DA'));
     if(fieldDictionary.exists('Opt'))
         localEnv['Opt'] = fieldDictionary.queryObject('Opt').toPDFArray();
 
@@ -89,7 +101,7 @@ function parseTextFieldValue(pdfParser, fieldDictionary,fieldName) {
 
 	if(valueField.getType() == hummus.ePDFObjectLiteralString) {
 		// text string. read into value
-		return valueField.toPDFLiteralString().toText();
+		return toText(valueField);
 	} else if(valueField.getType() == hummus.ePDFObjectStream) {
 		var bytes = [];
 		// stream. read it into the value
@@ -110,22 +122,22 @@ function parseTextFieldValue(pdfParser, fieldDictionary,fieldName) {
 function parseOpts(pdfParser, fieldDictionary) {
     if(fieldDictionary.exists('Opts')) {
         var opts = pdfParser.queryDictionaryObject(fieldDictionary,'Opts').toPDFArray().toJSArray();
-        return _.map(opts,function(opt){return opt.toPDFLiteralString().toText();});
+        return _.map(opts,toText);
     }
     else
         return undefined;
 }
 
 function parseChoiceValue(pdfParser, fieldDictionary) {
-	if(fieldDictionary.exists('V')) {
+    if(fieldDictionary.exists('V')) {
 		// might be either text or array of texts
 		var valueField = pdfParser.queryDictionaryObject(fieldDictionary,"V");
-		if(valueField.getType() == hummus.ePDFObjectLiteralString) {
+		if(valueField.getType() == hummus.ePDFObjectLiteralString || valueField.getType() == hummus.ePDFObjectHexString) {
 			// text string. read into value
-			return valueField.toPDFLiteralString().toText();
+			return toText(valueField);
 		} else if(valueField.getType == hummus.ePDFObjectArray) {
 			var arrayOfStrings = valueField.toPDFArray().toJSArray();
-            return _.map(arrayOfStrings,function(aString){return aString.toPDFLiteralString().toText();})
+            return _.map(arrayOfStrings,toText);
 		} else {
             return undefined;
 		}
@@ -191,12 +203,11 @@ function parseFieldsValueData(result,pdfParser,fieldDictionary,flags, inheritedP
 }
 
 function parseField(pdfParser,fieldDictionary,inheritedProperties,baseFieldName) {
-    var localFieldNameT = fieldDictionary.exists('T') ? fieldDictionary.queryObject('T').toPDFLiteralString().toText():undefined,
-		localFieldNameTU = fieldDictionary.exists('TU') ? fieldDictionary.queryObject('TU').toPDFLiteralString().toText():undefined,
-		localFieldNameTM = fieldDictionary.exists('TM') ? fieldDictionary.queryObject('TM').toPDFLiteralString().toText():undefined,
+    var localFieldNameT = fieldDictionary.exists('T') ? toText(fieldDictionary.queryObject('T')):undefined,
+		localFieldNameTU = fieldDictionary.exists('TU') ? toText(fieldDictionary.queryObject('TU')):undefined,
+		localFieldNameTM = fieldDictionary.exists('TM') ? toText(fieldDictionary.queryObject('TM')):undefined,
 		localFlags = fieldDictionary.exists('Ff') ? fieldDictionary.queryObject('Ff').toNumber():undefined,
         flags = localFlags === undefined ? inheritedProperties['Ff'] : localFlags;
-
 
     // i'm gonna assume that if there's no T and no kids, this is a widget annotation WHICH IS NOT a field and i'm out of here
     if(localFieldNameT === undefined && 
@@ -239,7 +250,6 @@ function parseField(pdfParser,fieldDictionary,inheritedProperties,baseFieldName)
 
 function parseFieldsArray(pdfParser,fieldsArray,inheritedProperties,baseFieldName) {
 	var result = [];
-	
 	for(var i=0;i<fieldsArray.getLength();++i) {
 		var fieldResult = parseField(pdfParser,
                                     pdfParser.queryArrayObject(fieldsArray,i).toPDFDictionary(),
