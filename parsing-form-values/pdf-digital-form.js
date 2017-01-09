@@ -281,7 +281,6 @@ function accumulateFieldsValues(result,fieldsArray) {
  * @param {PDFParser} pdfParser - A hummus PDF Parser for the PDF to read form from.
  */
 function PDFDigitalForm(pdfParser) {
-    this.isValid = true;
     this.acroformDict = parseForAcroformObject(pdfParser);
     
     if(this.acroformDict) {
