@@ -1,3 +1,5 @@
+var _ = require('lodash');
+
 function initTextState() {
     return  {
             charSpace:0,
@@ -5,6 +7,7 @@ function initTextState() {
             scale:100,
             leading:0,
             rise:0,
+            font:null,
             tm: [1,0,0,1,0,0],
             tlm: [1,0,0,1,0,0],
             tmDirty:true,
@@ -19,6 +22,7 @@ function cloneTextEnv(env) {
             scale:env.scale,
             leading:env.leading,
             rise:env.rise,
+            font:env.font ? _.extend({},env.font):env.font,
             tm:env.tm.slice(),
             tlm:env.tlm.slice(),
             tmDirty:env.tmDirty,
@@ -81,6 +85,9 @@ CollectionState.prototype.startTextElement = function() {
 }
 
 CollectionState.prototype.endTextElement = function(placements) {
+
+    // save text properties to persist after gone (some of them...)
+    var latestTextState = this.cloneCurrentTextState();
     this.inTextElement = false;
     this.textElementTextStack = null;
 
@@ -89,6 +96,12 @@ CollectionState.prototype.endTextElement = function(placements) {
         text: this.texts
     });    
     this.texts = null;
+
+    // copy persisted data to top text state
+    var persistingTextState =  this.currentTextState();
+    ['charSpace','wordSpace','scale','leading','rise','font'].forEach((name)=> {
+        persistingTextState[name] = latestTextState[name];
+    });
 }
 
 module.exports = CollectionState;
