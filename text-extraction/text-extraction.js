@@ -95,7 +95,6 @@ function textPlacement(input,state,placements) {
         };
         state.currentTextState().tmDirty = false;
         state.currentTextState().tlmDirty = false;
-
     state.texts.push(item);
 }
 
@@ -124,7 +123,7 @@ function collectPlacements(resources,placements,formsUsed) {
             case 'gs': {
                 if(resources.extGStates[operands[0].value]) {
                     if(resources.extGStates[operands[0].value].font)
-                    state.currentTextState().text.font = resources.extGStates[operands[0].value].font;
+                        state.currentTextState().text.font = _.extend({},resources.extGStates[operands[0].value].font);
                 }
                 break;
             }
