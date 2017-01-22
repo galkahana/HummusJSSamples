@@ -3,6 +3,7 @@ var _ = require('lodash');
 var extractPlacements = require('./placements-extraction');
 var transformations = require('./transformations');
 var CollectionState = require('./collection-state');
+var FontDecoding = require('./font-decoding');
 
 function readResources(resources,pdfReader,result) {
     var extGStates = {};
@@ -206,7 +207,7 @@ function collectPlacements(resources,placements,formsUsed) {
 
             // Text placement operators
             case 'Tj': {
-                textPlacement({asText:operands[0].value,asBytes:operands[0].toBytesArray()},state,placements);
+                textPlacement({asEncodedText:operands[0].value,asBytes:operands[0].toBytesArray()},state,placements);
                 break;
             }
             case '\'': {
@@ -223,7 +224,7 @@ function collectPlacements(resources,placements,formsUsed) {
                 var params = operands[0].toArray().toJSArray();
                 textPlacement(_.map(params,(item)=>{
                     if(item.getType() === hummus.ePDFLiteralString || item.getType() === hummus.ePDFHexString) 
-                        return {asText:item.value,asBytes:item.toBytesArray()};
+                        return {asEncodedText:item.value,asBytes:item.toBytesArray()};
                     else
                         return item.value;
                 }),state,placements);
@@ -233,8 +234,38 @@ function collectPlacements(resources,placements,formsUsed) {
     };
 }
 
+function translatePlacements(state,pdfReader,placements) {
+    // iterate the placements, getting the texts and translating them
+    placements.forEach((placement)=> {
+        if(placement.type === 'text') {
+            placement.text.forEach((item)=> {
+                if(!state.fontDecoders[item.textState.font.reference]) {
+                    state.fontDecoders[item.textState.font.reference] = new FontDecoding(pdfReader,item.textState.font.reference);
+                }
+                var decoder = state.fontDecoders[item.textState.font.reference];
+                item.text.asText = decoder.translate(item.text.asBytes);
+            });
+        }
+    });
+}
+
+function translate(pdfReader,pagesPlacements,formsPlacements) {
+    var state = {fontDecoders:{}};
+
+    pagesPlacements.forEach((placements)=>{translatePlacements(state,pdfReader,placements)});
+    _.forOwn(formsPlacements,(placements,objectId)=>{translatePlacements(state,pdfReader,placements)});
+
+    return {
+        pagesPlacements,
+        formsPlacements
+    };
+}
+
 function extractText(pdfReader) {
-    return extractPlacements(pdfReader,collectPlacements,readResources);
+    // 1st phase - extract placements
+    var {pagesPlacements,formsPlacements} = extractPlacements(pdfReader,collectPlacements,readResources);
+    // 2nd phase - translate encoded bytes to text strings. mutating the objects!
+    return translate(pdfReader,pagesPlacements,formsPlacements);
 }
 
 module.exports = extractText;

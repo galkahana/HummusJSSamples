@@ -48,4 +48,8 @@ PDFInterpreter.prototype.interpretXObjectContents = function(pdfReader,xobjectOb
     interpretContentStream(pdfReader,xobjectObject.toPDFStream(),onOperatorHandler);
 }
 
+PDFInterpreter.prototype.interpretStream = function(pdfReader,stream,onOperatorHandler) {
+    interpretContentStream(pdfReader,stream,onOperatorHandler)
+}
+
 module.exports = PDFInterpreter;
