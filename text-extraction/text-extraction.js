@@ -227,7 +227,7 @@ function collectPlacements(resources,placements,formsUsed) {
             case 'TJ': {
                 var params = operands[0].toPDFArray().toJSArray();
                 textPlacement(_.map(params,(item)=>{
-                    if(item.getType() === hummus.ePDFLiteralString || item.getType() === hummus.ePDFHexString) 
+                    if(item.getType() === hummus.ePDFObjectLiteralString || item.getType() === hummus.ePDFObjectHexString) 
                         return {asEncodedText:item.value,asBytes:toUnsignedCharsArray(item.toBytesArray())};
                     else
                         return item.value;
@@ -238,19 +238,35 @@ function collectPlacements(resources,placements,formsUsed) {
     };
 }
 
+function translateText(pdfReader,textItem,state,item) {
+    if(!state.fontDecoders[item.textState.font.reference]) {
+        state.fontDecoders[item.textState.font.reference] = new FontDecoding(pdfReader,item.textState.font.reference);
+    }
+    var decoder = state.fontDecoders[item.textState.font.reference];
+    var translation = decoder.translate(textItem.asBytes);
+    textItem.asText = translation.result;
+    textItem.translationMethod = translation.method;
+}
+
 function translatePlacements(state,pdfReader,placements) {
     // iterate the placements, getting the texts and translating them
     placements.forEach((placement)=> {
         if(placement.type === 'text') {
             placement.text.forEach((item)=> {
-                if(!state.fontDecoders[item.textState.font.reference]) {
-                    state.fontDecoders[item.textState.font.reference] = new FontDecoding(pdfReader,item.textState.font.reference);
-                }
-                var decoder = state.fontDecoders[item.textState.font.reference];
-                var translation = decoder.translate(item.text.asBytes);
-                item.text.asText = translation.result;
-                item.text.translationMethod = translation.method;
+                if(_.isArray(item.text)) {
+                    // TJ case
+                    item.text.forEach((textItem)=> {
+                        if(textItem.asBytes) {
+                            // in case it's text and not position change
+                            translateText(pdfReader,textItem,state,item);
+                        }
+                    });
 
+                }
+                else {
+                    // Tj case
+                    translateText(pdfReader,item.text,state,item);
+                }
             });
         }
     });
