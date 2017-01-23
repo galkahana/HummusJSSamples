@@ -1,6 +1,10 @@
 var _ = require('lodash');
 var PDFInterpreter = require('./pdf-interpreter');
 
+function toUnsignedCharsArray(charsArray) {
+    return _.map(charsArray,(char)=> {return char < 0 ? (char+256):char})
+}
+
 function besToUnicodes(inArray) {
     var i=0;
     var unicodes = [];
@@ -48,26 +52,26 @@ function parseToUnicode(pdfReader,toUnicodeObjectId) {
         if(operatorName === 'endbfchar') {
             // Operators are pairs. always of the form <codeByte> <unicodes>
             for(var i=0;i<operands.length;i+=2) {
-                var byteCode = operands[i].toBytesArray();
-                var unicodes = operands[i+1].toBytesArray();
+                var byteCode = toUnsignedCharsArray(operands[i].toBytesArray());
+                var unicodes = toUnsignedCharsArray(operands[i+1].toBytesArray());
                 map[beToNum(byteCode)] = besToUnicodes(unicodes);
             }
         }
         else if(operatorName === 'endbfrange') {
             // Operators are 3. two codesBytes and then either a unicode start range or array of unicodes
             for(var i=0;i<operands.length;i+=3) {
-                var startCode = operands[i].toBytesArray();
-                var endCode = operands[i+1].toBytesArray();
+                var startCode = toUnsignedCharsArray(operands[i].toBytesArray());
+                var endCode = toUnsignedCharsArray(operands[i+1].toBytesArray());
                 
                 if(operands[i+2].getType() === hummus.ePDFArray) {
                     var unicodeArray = operands[i+2].toPDFArray();
                     // specific codes
                     for(var j = startCode;j<=endCode;++j) {
-                        map[j] = besToUnicodes(unicodeArray.queryObject(j).toBytesArray());
+                        map[j] = besToUnicodes(toUnsignedCharsArray(unicodeArray.queryObject(j).toBytesArray()));
                     }
                 }
                 else {
-                    var unicodes =  besToUnicodes(operands[i+2].toBytesArray())
+                    var unicodes =  besToUnicodes(toUnsignedCharsArray(operands[i+2].toBytesArray()));
                     // code range
                     for(var j = startCode;j<=endCode;++j) {
                         map[j] = unicodes.slice();
@@ -98,12 +102,22 @@ function parseFontData(self,pdfReader,fontObjectId) {
 }
 
 
-function toUnicodeEncoding(toUnicodeMap,bytes) {
+function toUnicodeEncoding(toUnicodeMap,isSimpleFont,bytes) {
     var result = '';
 
-    bytes.forEach((aByte)=> {
-        result+= String.fromCharCode.apply(String,toUnicodeMap[aByte]);
-    });
+    if(isSimpleFont) {
+        // 1 byte
+        bytes.forEach((aByte)=> {
+            result+= String.fromCharCode.apply(String,toUnicodeMap[aByte]);
+        });
+    }
+    else {
+        // 2 bytes
+        for(var i=0;i<bytes.length;i+=2) {
+            var value = bytes[i]*256 + bytes[i+1];
+            result+= String.fromCharCode.apply(String,toUnicodeMap[value]);
+        }
+    }
 
     return result;
 }
@@ -119,10 +133,10 @@ function FontDecoding(pdfReader,fontObjectId) {
 
 FontDecoding.prototype.translate = function(encodedBytes) {
     if(this.hasToUnicode) {
-        return toUnicodeEncoding(this.toUnicodeMap,encodedBytes);
+        return {result:toUnicodeEncoding(this.toUnicodeMap,this.isSimpleFont,encodedBytes),method:'toUnicode'};
     }
     else {
-        return defaultEncoding(encodedBytes);
+        return {result:defaultEncoding(encodedBytes),method:'default'};
     }
 }
 
