@@ -11,7 +11,7 @@ function runMe() {
         return _.map(objectPlacements,
                 (placement)=> {
                     if(placement.type === 'text')
-                        return _.map(placement.text,(item)=> {return {text:item.text};});
+                        return _.map(placement.text,(item)=> {return _.isArray(item.text) ? (_.map(item.text,(TJItem)=>{return TJItem.asText || TJItem})) : item.text.asText});
                     else 
                         return placement.objectId;
                 });
