@@ -5,6 +5,10 @@ var transformations = require('./transformations');
 var CollectionState = require('./collection-state');
 var FontDecoding = require('./font-decoding');
 
+function toUnsignedCharsArray(charsArray) {
+    return _.map(charsArray,(char)=> {return char < 0 ? (char+256):char})
+}
+
 function readResources(resources,pdfReader,result) {
     var extGStates = {};
     var fonts = {};
@@ -54,11 +58,11 @@ function readResources(resources,pdfReader,result) {
     result.fonts = fonts;
 }
 
-function Tc(charSpace) {
+function Tc(charSpace,state) {
     state.currentTextState().charSpace = charSpace;
 }
 
-function Tw(wordSpace) {
+function Tw(wordSpace,state) {
     state.currentTextState().wordSpace = wordSpace;
 }
 
@@ -80,7 +84,7 @@ function TL(leading,state) {
 }
 
 function TStar(state) {
-    Td(state.currentTextState().leading);
+    Td(0,state.currentTextState().leading,state);
 }
 
 function Quote(text,state,placements) {
@@ -158,7 +162,7 @@ function collectPlacements(resources,placements,formsUsed) {
                 break;
             }
             case 'TL': {
-                TL(operands[0].value);
+                TL(operands[0].value,state);
                 break;
             }     
             case 'Ts': {
@@ -188,11 +192,11 @@ function collectPlacements(resources,placements,formsUsed) {
 
             // Text positioining operators
             case 'Td': {
-                td(operands[0].value,operands[1].value,state);
+                Td(operands[0].value,operands[1].value,state);
                 break;
             }
             case 'TD': {
-                TL(-operands[1].value);
+                TL(-operands[1].value,state);
                 Td(operands[0].value,operands[1].value,state);
                 break;
             }
@@ -207,7 +211,7 @@ function collectPlacements(resources,placements,formsUsed) {
 
             // Text placement operators
             case 'Tj': {
-                textPlacement({asEncodedText:operands[0].value,asBytes:operands[0].toBytesArray()},state,placements);
+                textPlacement({asEncodedText:operands[0].value,asBytes:toUnsignedCharsArray(operands[0].toBytesArray())},state,placements);
                 break;
             }
             case '\'': {
@@ -221,10 +225,10 @@ function collectPlacements(resources,placements,formsUsed) {
                 break;
             }
             case 'TJ': {
-                var params = operands[0].toArray().toJSArray();
+                var params = operands[0].toPDFArray().toJSArray();
                 textPlacement(_.map(params,(item)=>{
                     if(item.getType() === hummus.ePDFLiteralString || item.getType() === hummus.ePDFHexString) 
-                        return {asEncodedText:item.value,asBytes:item.toBytesArray()};
+                        return {asEncodedText:item.value,asBytes:toUnsignedCharsArray(item.toBytesArray())};
                     else
                         return item.value;
                 }),state,placements);
@@ -243,7 +247,10 @@ function translatePlacements(state,pdfReader,placements) {
                     state.fontDecoders[item.textState.font.reference] = new FontDecoding(pdfReader,item.textState.font.reference);
                 }
                 var decoder = state.fontDecoders[item.textState.font.reference];
-                item.text.asText = decoder.translate(item.text.asBytes);
+                var translation = decoder.translate(item.text.asBytes);
+                item.text.asText = translation.result;
+                item.text.translationMethod = translation.method;
+
             });
         }
     });
