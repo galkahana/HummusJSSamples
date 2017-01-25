@@ -255,6 +255,21 @@ function translatePlacements(state,pdfReader,placements) {
             placement.text.forEach((item)=> {
                 if(_.isArray(item.text)) {
                     // TJ case
+
+                    // save all text
+                    var allText = _.reduce(item.text,(result,textItem)=> {
+                        if(textItem.asBytes) {
+                            return result.concat(textItem.asBytes);
+                        }
+                        else
+                            return result;
+                    },[]);
+                    item.allText = {
+                        asBytes : allText
+                    };
+                    translateText(pdfReader,item.allText,state,item);
+                    
+                    // also parts
                     item.text.forEach((textItem)=> {
                         if(textItem.asBytes) {
                             // in case it's text and not position change
