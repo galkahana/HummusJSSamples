@@ -201,23 +201,19 @@ function parseFontData(self,pdfReader,fontObjectId) {
 }
 
 
-function toUnicodeEncoding(toUnicodeMap,isSimpleFont,bytes) {
+function toUnicodeEncoding(toUnicodeMap,bytes) {
     var result = '';
 
-    if(isSimpleFont) {
-        // 1 byte
-        bytes.forEach((aByte)=> {
-            result+= String.fromCharCode.apply(String,toUnicodeMap[aByte]);
-        });
-    }
-    else {
-        // 2 bytes
-        for(var i=0;i<bytes.length;i+=2) {
-            var value = bytes[i]*256 + bytes[i+1];
+        var i=0;
+        while(i<bytes.length) {
+            var value = bytes[i];
+            i+=1;
+            while(i<bytes.length && (toUnicodeMap[value] === undefined)) {
+                value = value*256 + bytes[i];
+                i+=1;
+            }
             result+= String.fromCharCode.apply(String,toUnicodeMap[value]);
         }
-    }
-
     return result;
 }
 
@@ -249,7 +245,7 @@ function FontDecoding(pdfReader,fontObjectId) {
 
 FontDecoding.prototype.translate = function(encodedBytes) {
     if(this.hasToUnicode) {
-        return {result:toUnicodeEncoding(this.toUnicodeMap,this.isSimpleFont,encodedBytes),method:'toUnicode'};
+        return {result:toUnicodeEncoding(this.toUnicodeMap,encodedBytes),method:'toUnicode'};
     }
     else if(this.hasSimpleEncoding) {
         return {result:toSimpleEncoding(this.fromSimpleEncodingMap,encodedBytes),method:'simpleEncoding'};
