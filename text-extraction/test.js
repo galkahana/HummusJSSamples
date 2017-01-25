@@ -36,10 +36,8 @@ function runMe() {
                                     return item;
                                 }
                                 else {
-                                    return _.isArray(item.text) ? 
-                                                _.map(item.text,(TJItem)=>{
-                                                        return _.isObject(TJItem) ? itemDisplay(TJItem):TJItem
-                                                }) : 
+                                    return item.allText ? 
+                                                itemDisplay(item.allText) : 
                                                 itemDisplay(item.text)
                         }});
                     } else {
