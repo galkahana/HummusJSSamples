@@ -57,6 +57,7 @@ function parseToUnicode(pdfReader,toUnicodeObjectId) {
 
     interpreter.interpretStream(pdfReader,stream, (operatorName,operands)=> {
         if(operatorName === 'endbfchar') {
+
             // Operators are pairs. always of the form <codeByte> <unicodes>
             for(var i=0;i<operands.length;i+=2) {
                 var byteCode = toUnsignedCharsArray(operands[i].toBytesArray());
@@ -65,10 +66,11 @@ function parseToUnicode(pdfReader,toUnicodeObjectId) {
             }
         }
         else if(operatorName === 'endbfrange') {
+            
             // Operators are 3. two codesBytes and then either a unicode start range or array of unicodes
             for(var i=0;i<operands.length;i+=3) {
-                var startCode = toUnsignedCharsArray(operands[i].toBytesArray());
-                var endCode = toUnsignedCharsArray(operands[i+1].toBytesArray());
+                var startCode = beToNum(toUnsignedCharsArray(operands[i].toBytesArray()));
+                var endCode = beToNum(toUnsignedCharsArray(operands[i+1].toBytesArray()));
                 
                 if(operands[i+2].getType() === hummus.ePDFArray) {
                     var unicodeArray = operands[i+2].toPDFArray();
