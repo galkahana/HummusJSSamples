@@ -158,7 +158,7 @@ function collectPlacements(resources,placements,formsUsed) {
                 break;
             }
             case 'Tz': {
-                state.currentTextState().horizontalScaling = operands[0].value;
+                state.currentTextState().scale = operands[0].value;
                 break;
             }
             case 'TL': {
@@ -238,11 +238,15 @@ function collectPlacements(resources,placements,formsUsed) {
     };
 }
 
-function translateText(pdfReader,textItem,state,item) {
+function fetchFontDecoder(item,pdfReader,state) {
     if(!state.fontDecoders[item.textState.font.reference]) {
         state.fontDecoders[item.textState.font.reference] = new FontDecoding(pdfReader,item.textState.font.reference);
     }
-    var decoder = state.fontDecoders[item.textState.font.reference];
+    return state.fontDecoders[item.textState.font.reference];
+}
+
+function translateText(pdfReader,textItem,state,item) {
+    var decoder = fetchFontDecoder(item, pdfReader, state);
     var translation = decoder.translate(textItem.asBytes);
     textItem.asText = translation.result;
     textItem.translationMethod = translation.method;
@@ -287,9 +291,7 @@ function translatePlacements(state,pdfReader,placements) {
     });
 }
 
-function translate(pdfReader,pagesPlacements,formsPlacements) {
-    var state = {fontDecoders:{}};
-
+function translate(state,pdfReader,pagesPlacements,formsPlacements) {
     pagesPlacements.forEach((placements)=>{translatePlacements(state,pdfReader,placements)});
     _.forOwn(formsPlacements,(placements,objectId)=>{translatePlacements(state,pdfReader,placements)});
 
@@ -299,11 +301,78 @@ function translate(pdfReader,pagesPlacements,formsPlacements) {
     };
 }
 
+function computePlacementsDimensions(state, pdfReader, placements) {
+    // iterate the placements computing bounding boxes
+    placements.forEach((placement)=> {
+        if(placement.type === 'text') {
+            // this is a BT..ET sequance 
+            var nextPlacementDefaultTm = null;
+            placement.text.forEach((item)=> {
+                // if matrix is not dirty (no matrix changing operators were running betwee items), replace with computed matrix of the previous round.
+                if(!item.textState.tmDirty && nextPlacementDefaultTm)
+                    item.textState.tm = nextPlacementDefaultTm.slice();
+
+                // Compute matrix and placement after this text
+                var decoder = fetchFontDecoder(item, pdfReader, state);
+
+                var accumulatedDisplacement = 0;
+                nextPlacementDefaultTm = item.textState.tm;
+                if(_.isArray(item.text)) {
+                    var nextTJ = 0;
+                    // TJ
+                    item.text.forEach((textItem)=> {
+                        if(textItem.asBytes) {
+                             // marks a string
+                            decoder.iterateTextDisplacements(textItem.asBytes,(displacement,charCode)=> {
+                                var tx = ((displacement-nextTJ/1000)*item.textState.font.size + item.textState.charSpace + (charCode === 32 ? item.textState.wordSpace:0))*item.textState.scale/100;
+                                nextTJ = 0;
+                                accumulatedDisplacement+=tx;
+                                nextPlacementDefaultTm = transformations.multiplyMatrix([1,0,0,1,tx,0],nextPlacementDefaultTm);
+                            });
+                        }
+                        else {
+                            // marks a number
+                            nextTJ = textItem;
+                        }
+                    });
+                }
+                else {
+                    // Tj case
+                    decoder.iterateTextDisplacements(item.text.asBytes,(displacement,charCode)=> {
+                        var tx = (displacement*item.textState.font.size + item.textState.charSpace + (charCode === 32 ? item.textState.wordSpace:0))*item.textState.scale/100;
+
+                        accumulatedDisplacement+=tx;
+                        nextPlacementDefaultTm = transformations.multiplyMatrix([1,0,0,1,tx,0],nextPlacementDefaultTm);
+                    });
+                }
+                item.textState.tmAtEnd = nextPlacementDefaultTm.slice();
+                item.displacement = accumulatedDisplacement;
+            item.localBBox = [0,(decoder.descent || 0)*item.textState.font.size/1000,item.displacement,(decoder.ascent || 0)*item.textState.font.size/1000];
+            });
+        }
+    });
+}
+
+function computeDimensions(state,pdfReader,pagesPlacements,formsPlacements) {
+    pagesPlacements.forEach((placements)=>{computePlacementsDimensions(state,pdfReader,placements)});
+    _.forOwn(formsPlacements,(placements,objectId)=>{computePlacementsDimensions(state,pdfReader,placements)});
+
+    return {
+        pagesPlacements,
+        formsPlacements
+    };
+}
+
+
 function extractText(pdfReader) {
     // 1st phase - extract placements
     var {pagesPlacements,formsPlacements} = extractPlacements(pdfReader,collectPlacements,readResources);
     // 2nd phase - translate encoded bytes to text strings. mutating the objects!
-    return translate(pdfReader,pagesPlacements,formsPlacements);
+    var state = {fontDecoders:{}};
+    translate(state,pdfReader,pagesPlacements,formsPlacements);
+    // 3rd phase - compute dimensions
+    return computeDimensions(state,pdfReader,pagesPlacements,formsPlacements);
+
 }
 
 module.exports = extractText;
