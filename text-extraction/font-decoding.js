@@ -178,6 +178,72 @@ function parseSimpleFontEncoding(self,pdfReader,font, encoding) {
     }
 }
 
+function parseSimpleFontDimensions(self,pdfReader,font) {
+    // read specified widths
+    if(!font.exists('FirstChar') || !font.exists('LastChar') || !font.exists('Widths'))
+        return;
+    
+    var firstChar = pdfReader.queryDictionaryObject(font,'FirstChar').value;
+    var lastChar = pdfReader.queryDictionaryObject(font,'LastChar').value;
+    var widths = pdfReader.queryDictionaryObject(font,'Widths').toPDFArray();
+
+    // store widths for specified glyphs
+    self.widths = {};
+    for(var i = firstChar; i<=lastChar;++i) {
+        self.widths[i] = pdfReader.queryArrayObject(widths,i-firstChar).value;
+    }
+
+    if(!font.exists('FontDescriptor'))
+        return;
+
+    // complete info with font descriptor
+    var fontDescriptor = pdfReader.queryDictionaryObject(font,'FontDescriptor');
+    self.descent = pdfReader.queryDictionaryObject(fontDescriptor,'Descent').value;
+    self.ascent = pdfReader.queryDictionaryObject(fontDescriptor,'Ascent').value;
+    self.defaultWidth = fontDescriptor.exists('MissingWidth') ? pdfReader.queryDictionaryObject(fontDescriptor,'MissingWidth').value:0;
+}
+
+function parseCIDFontDimensions(self, pdfReader,font) {
+    // get the descendents font
+    var descendentFonts = pdfReader.queryDictionaryObject(font,'DescendantFonts').toPDFArray();
+    var descendentFont = pdfReader.queryArrayObject(descendentFonts,0).toPDFDictionary();
+    // default width is easily accessible directly via DW
+    self.defaultWidth = descendentFont.exists('DW') ? pdfReader.queryDictionaryObject(descendentFont,'DW').value : 1000;
+    self.widths = {};
+    if(descendentFont.exists('W')) {
+        var widths = pdfReader.queryDictionaryObject(descendentFont,'W').toPDFArray().toJSArray();
+
+        var i=0;
+        while(i<widths.length) {
+            var cFirst = widths[i].value;
+            ++i;
+            if(widths[i].getType() === hummus.ePDFObjectArray) {
+                var anArray = widths[i].toPDFArray().toJSArray();
+                ++i;
+                // specified widths
+                for(var j=0;j<anArray.length;++j)
+                    self.widths[cFirst+j] = anArray[j];
+            }
+            else {
+                // same width for range
+                var cLast = widths[i].value;
+                ++i;
+                var width = widths[i].value;
+                ++i;
+                for(var j=cFirst;j<=cLast;++j)
+                    self.widths[j] = width;
+            }
+        }
+    }
+
+    // complete info with font descriptor
+    var fontDescriptor = pdfReader.queryDictionaryObject(descendentFont,'FontDescriptor');
+    self.descent = pdfReader.queryDictionaryObject(fontDescriptor,'Descent').value;
+    self.ascent = pdfReader.queryDictionaryObject(fontDescriptor,'Ascent').value;
+}
+
+
+
 function parseFontData(self,pdfReader,fontObjectId) {
     var font = pdfReader.parseNewObject(fontObjectId).toPDFDictionary();
     if(!font)
@@ -185,17 +251,23 @@ function parseFontData(self,pdfReader,fontObjectId) {
 
     self.isSimpleFont = font.queryObject('Subtype').value !== 'Type0';
 
+    // parse translating information
     if(font.exists('ToUnicode')) {
+        // to unicode map
         self.hasToUnicode = true;
         self.toUnicodeMap = parseToUnicode(pdfReader,font.queryObject('ToUnicode').toPDFIndirectObjectReference().getObjectID());
-        // if there's toUnicode there's no need to obtain more info. it is the default anyways
-        return;
-    }
-
-    // otherwise. try encoding
-    if(self.isSimpleFont) {
+    } else if(self.isSimpleFont) {
+        // simple font encoding
         if(font.exists('Encoding'))
             parseSimpleFontEncoding(self,pdfReader,font, font.queryObject('Encoding'));
+    }
+
+    // parse dimensions information
+    if(self.isSimpleFont) {
+        parseSimpleFontDimensions(self,pdfReader,font);
+    }
+    else {
+        parseCIDFontDimensions(self, pdfReader, font);
     }
 
 }
@@ -252,6 +324,36 @@ FontDecoding.prototype.translate = function(encodedBytes) {
     }
     else {
         return {result:defaultEncoding(encodedBytes),method:'default'};
+    }
+}
+
+FontDecoding.prototype.iterateTextDisplacements = function(encodedBytes,iterator) {
+    if(this.isSimpleFont) {
+        // one code per call
+        encodedBytes.forEach((code)=>{
+            iterator(((this.widths && this.widths[code]) || this.defaultWidth || 0) / 1000,code);
+        });
+    }
+    else if(this.hasToUnicode){
+        // determine code per toUnicode (should be cmap, but i aint parsing it now, so toUnicode will do).
+        // assuming horizontal writing mode
+        var i=0;
+        while(i<encodedBytes.length) {
+            var code = encodedBytes[i];
+            i+=1;
+            while(i<encodedBytes.length && (this.toUnicodeMap[code] === undefined)) {
+                code = code*256 + encodedBytes[i];
+                i+=1;
+            }
+            iterator(((this.widths && this.widths[code]) || this.defaultWidth || 0) / 1000,code);
+        }        
+    }
+    else {
+        // default to 2 bytes. though i shuld be reading the cmap. and so also get the writing mode
+        for(var i=0;i<encodedBytes.length;i+=2) {
+            var code = encodedBytes[0]*256 + encodedBytes[1];
+            iterator(((this.widths && this.widths[code]) || this.defaultWidth || 0) / 1000,code);
+        }
     }
 }
 

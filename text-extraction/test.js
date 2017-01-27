@@ -46,8 +46,12 @@ function runMe() {
                 });
     }
 
-    console.log('pages text placements',JSON.stringify(_.map(pagesPlacements,placementToDisplay),null,2));
-    console.log('forms text Placements',JSON.stringify(_.mapValues(formsPlacements,placementToDisplay),null,2));
+    //console.log('pages text placements',JSON.stringify(_.map(pagesPlacements,placementToDisplay),null,2));
+    //console.log('forms text Placements',JSON.stringify(_.mapValues(formsPlacements,placementToDisplay),null,2));
+    
+    console.log('pages text placements',JSON.stringify(pagesPlacements, null, 2));
+    console.log('forms text Placements',JSON.stringify(formsPlacements, null, 2));
+    
 }
 
 runMe();
