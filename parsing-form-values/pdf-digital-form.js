@@ -13,7 +13,6 @@ function toText(item) {
     else if(item.getType() === hummus.ePDFObjectHexString) {
         return item.toPDFHexString().toText();
     } else {
-        console.log('else')
         return item.value;
     }
 }
