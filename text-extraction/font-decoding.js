@@ -7,6 +7,7 @@ var MacRomanEncoding = require('./encoding/mac-roman-encoding');
 var StandardEncoding = require('./encoding/standard-encoding');
 var SymbolEncoding = require('./encoding/symbol-encoding');
 var AdobeGlyphList = require('./encoding/adobe-glyph-list');
+var StandardFontsDimensions = require('./standard-fonts-dimensions');
 
 function toUnsignedCharsArray(charsArray) {
     return _.map(charsArray,(char)=> {return char < 0 ? (char+256):char})
@@ -117,9 +118,9 @@ function setupDifferencesEncodingMap(pdfReader,font, encodingDict) {
     // k. got ourselves differences array. let's see.
     var newEncoding = null;
     if(encodingDict.exists('BaseEncoding')) {
-        var baseEconding = getStandardEncodingMap(pdfReader.queryDictionaryObject(encodingDict,'BaseEncoding').value);
+        var baseEncoding = getStandardEncodingMap(pdfReader.queryDictionaryObject(encodingDict,'BaseEncoding').value);
         if(baseEncoding) {
-            newEncoding = _.extend({},baseEconding);
+            newEncoding = _.extend({},baseEncoding);
         }
     }
 
@@ -180,18 +181,30 @@ function parseSimpleFontEncoding(self,pdfReader,font, encoding) {
 
 function parseSimpleFontDimensions(self,pdfReader,font) {
     // read specified widths
-    if(!font.exists('FirstChar') || !font.exists('LastChar') || !font.exists('Widths'))
-        return;
-    
-    var firstChar = pdfReader.queryDictionaryObject(font,'FirstChar').value;
-    var lastChar = pdfReader.queryDictionaryObject(font,'LastChar').value;
-    var widths = pdfReader.queryDictionaryObject(font,'Widths').toPDFArray();
+    if(font.exists('FirstChar') && font.exists('LastChar') && font.exists('Widths')) {
+        var firstChar = pdfReader.queryDictionaryObject(font,'FirstChar').value;
+        var lastChar = pdfReader.queryDictionaryObject(font,'LastChar').value;
+        var widths = pdfReader.queryDictionaryObject(font,'Widths').toPDFArray();
 
-    // store widths for specified glyphs
-    self.widths = {};
-    for(var i = firstChar; i<=lastChar;++i) {
-        self.widths[i] = pdfReader.queryArrayObject(widths,i-firstChar).value;
+        // store widths for specified glyphs
+        self.widths = {};
+        for(var i = firstChar; i<=lastChar;++i) {
+            self.widths[i] = pdfReader.queryArrayObject(widths,i-firstChar).value;
+        }
     }
+    else {
+        // wtf. probably one of the standard fonts. aha! [will also take care of ascent descent]
+        if(font.exists('BaseFont')) {
+            var name = pdfReader.queryDictionaryObject(font,'BaseFont').value;
+            var standardDimensions = StandardFontsDimensions[name] || StandardFontsDimensions[name.replace(/-/g,'−')]; // seriously...WTF
+            if(standardDimensions) {
+                self.descent = standardDimensions.descent;
+                self.ascent = standardDimensions.ascent;
+                self.widths = _.extend({},standardDimensions.widths);
+            }
+        }
+    }
+    
 
     if(!font.exists('FontDescriptor'))
         return;

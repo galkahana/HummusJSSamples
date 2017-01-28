@@ -1,10 +1,27 @@
 var hummus = require('hummus');
-
+var _ = require('lodash');
 function PDFInterpreter() {
 
 }
 
+function toUnsignedCharsArray(charsArray) {
+    return _.map(charsArray,(char)=> {return char < 0 ? (char+256):char})
+}
+
+function debugStream(pdfReader,contentStream) {
+    var readStream = pdfReader.startReadingFromStream(contentStream);
+    var result = '';
+    while(readStream.notEnded())
+    {
+        var readData = readStream.read(10000);
+        result+=String.fromCharCode.apply(String,toUnsignedCharsArray(readData));
+    }    
+    console.log('stream content',result);
+}
+
 function interpretContentStream(pdfReader,contentStream,onOperatorHandler, operandStackInit) {
+    //debugStream(pdfReader,contentStream);
+    
     var objectParser = pdfReader.startReadingObjectsFromStream(contentStream);
         
     var operandsStack = operandStackInit || [];

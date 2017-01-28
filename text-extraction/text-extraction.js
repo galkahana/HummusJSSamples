@@ -84,7 +84,11 @@ function TL(leading,state) {
 }
 
 function TStar(state) {
-    Td(0,state.currentTextState().leading,state);
+    // there's an error in the book explanation
+    // but we know better. leading goes below,
+    // not up. this is further explicated by
+    // the TD explanation
+    Td(0,-state.currentTextState().leading,state);
 }
 
 function Quote(text,state,placements) {
@@ -95,7 +99,7 @@ function Quote(text,state,placements) {
 function textPlacement(input,state,placements) {
     var item = {
             text:input,
-            ctm:state.currentGraphicState().ctm,
+            ctm:state.currentGraphicState().ctm.slice(),
             textState:state.cloneCurrentTextState()
         };
         state.currentTextState().tmDirty = false;
@@ -137,9 +141,11 @@ function collectPlacements(resources,placements,formsUsed) {
             case 'Do': {
                 // add placement, if form, and mark for later inspection
                 if(resources.forms[operands[0].value]) {
+                    var form = resources.forms[operands[0].value];
                     placements.push({
                         type:'xobject',
-                        objectId:resources.forms[operands[0].value].id,
+                        objectId:form.id,
+                        matrix: form.matrix ? form.matrix.slice():null,
                         ctm:state.currentGraphicState().ctm.slice()
                     });
                     // add for later inspection (helping the extraction method a bit..[can i factor out? interesting enough?])
@@ -316,23 +322,32 @@ function computePlacementsDimensions(state, pdfReader, placements) {
                 var decoder = fetchFontDecoder(item, pdfReader, state);
 
                 var accumulatedDisplacement = 0;
+                var minPlacement = 0;
+                var maxPlacement = 0;
                 nextPlacementDefaultTm = item.textState.tm;
                 if(_.isArray(item.text)) {
-                    var nextTJ = 0;
                     // TJ
                     item.text.forEach((textItem)=> {
                         if(textItem.asBytes) {
                              // marks a string
                             decoder.iterateTextDisplacements(textItem.asBytes,(displacement,charCode)=> {
-                                var tx = ((displacement-nextTJ/1000)*item.textState.font.size + item.textState.charSpace + (charCode === 32 ? item.textState.wordSpace:0))*item.textState.scale/100;
-                                nextTJ = 0;
+                                var tx = (displacement*item.textState.font.size + item.textState.charSpace + (charCode === 32 ? item.textState.wordSpace:0))*item.textState.scale/100;
                                 accumulatedDisplacement+=tx;
+                                if(accumulatedDisplacement<minPlacement)
+                                    minPlacement = accumulatedDisplacement;
+                                if(accumulatedDisplacement>maxPlacement)
+                                    maxPlacement = accumulatedDisplacement;
                                 nextPlacementDefaultTm = transformations.multiplyMatrix([1,0,0,1,tx,0],nextPlacementDefaultTm);
                             });
                         }
                         else {
-                            // marks a number
-                            nextTJ = textItem;
+                            var tx = ((-textItem/1000)*item.textState.font.size)*item.textState.scale/100;
+                            accumulatedDisplacement+=tx;
+                            if(accumulatedDisplacement<minPlacement)
+                                minPlacement = accumulatedDisplacement;
+                            if(accumulatedDisplacement>maxPlacement)
+                                maxPlacement = accumulatedDisplacement;
+                            nextPlacementDefaultTm = transformations.multiplyMatrix([1,0,0,1,tx,0],nextPlacementDefaultTm);
                         }
                     });
                 }
@@ -342,12 +357,18 @@ function computePlacementsDimensions(state, pdfReader, placements) {
                         var tx = (displacement*item.textState.font.size + item.textState.charSpace + (charCode === 32 ? item.textState.wordSpace:0))*item.textState.scale/100;
 
                         accumulatedDisplacement+=tx;
+                        if(accumulatedDisplacement<minPlacement)
+                            minPlacement = accumulatedDisplacement;
+                        if(accumulatedDisplacement>maxPlacement)
+                            maxPlacement = accumulatedDisplacement;
                         nextPlacementDefaultTm = transformations.multiplyMatrix([1,0,0,1,tx,0],nextPlacementDefaultTm);
                     });
                 }
                 item.textState.tmAtEnd = nextPlacementDefaultTm.slice();
                 item.displacement = accumulatedDisplacement;
-            item.localBBox = [0,(decoder.descent || 0)*item.textState.font.size/1000,item.displacement,(decoder.ascent || 0)*item.textState.font.size/1000];
+                var descentPlacement = ((decoder.descent || 0) + item.textState.rise)*item.textState.font.size/1000;
+                var ascentPlacement = ((decoder.ascent) || 0 + item.textState.rise)*item.textState.font.size/1000;
+                item.localBBox = [minPlacement,descentPlacement,maxPlacement,ascentPlacement];
             });
         }
     });
@@ -363,16 +384,89 @@ function computeDimensions(state,pdfReader,pagesPlacements,formsPlacements) {
     };
 }
 
+function resolveForm(formObjectId,formsPlacements,resolvedForms) {
+    if(!resolvedForms[formObjectId]) {
+        resolvedForms[formObjectId] = true;
+        formsPlacements[formObjectId] = resolveFormPlacements(formsPlacements[formObjectId]);
+    }
+    return formsPlacements[formObjectId];
+}
 
+function resolveFormPlacements(objectPlacements,formsPlacements,resolvedForms) {
+    for(var i=objectPlacements.length-1;i>=0;--i) {
+        var placement = objectPlacements[i];
+        if(placement.type === 'xobject') {
+            // make sure form is resolved in itself
+            var resolvedFormPlacements = resolveForm(placement.objectId,formsPlacements,resolvedForms);
+            // grab its placements and make them our own
+            var newPlacements = [i,1];
+            resolvedFormPlacements.forEach((formTextPlacement)=> {
+                // all of them have to be text placements now, cause it's resolved
+                var clonedPlacemet = _.cloneDeep(formTextPlacement);
+                // multiply with this placement CTM, and insert at this point
+                clonedPlacemet.text.forEach((textPlacement)=> {
+                    var formMatrix = placement.matrix ? transformations.multiplyMatrix(placement.matrix,placement.ctm):placement.ctm;
+                    textPlacement.ctm = transformations.multiplyMatrix(textPlacements.ctm,formMatrix);
+                });
+                newPlacements.push(clonedPlacemet);
+            });
+            // replace xobject placement with new text placements
+            objectPlacements.splice.apply(objectPlacements,newPlacements);
+        }
+    }
+    return objectPlacements;
+}
+
+function mergeForms(pagesPlacements,formsPlacements) {
+    var state = {};
+
+    // replace forms placements with their text placements
+    return _.map(pagesPlacements,(pagePlacements)=> {return resolveFormPlacements(pagePlacements,formsPlacements,state);});
+}
+
+function flattenPlacements(pagesPlacements) {
+    return _.map(pagesPlacements,(pagePlacements)=> {
+        return _.reduce(pagePlacements,(result,pagePlacement)=> {
+            var textPlacements = _.map(pagePlacement.text,(textPlacement)=> {
+                var matrix = transformations.multiplyMatrix(textPlacement.textState.tm,textPlacement.ctm);
+                var newPlacement = {
+                    text: textPlacement.allText ? textPlacement.allText.asText : textPlacement.text.asText,
+                    matrix:matrix,
+                    localBBox: textPlacement.localBBox.slice(),
+                    globalBBox: transformations.transformBox(textPlacement.localBBox,matrix)
+                }
+                return newPlacement;
+            });
+            return result.concat(textPlacements);
+        },[]);
+    });
+}
+
+/**
+ * Extracts text from all pages of the pdf.
+ * end result is an array matching the pages of the pdf.
+ * each item has an array of text placements.
+ * each text placement is of the form:
+ * {
+ *      text: the text
+ *      matrix: 6 numbers pdf matrix describing how the text is transformed in relation to the page (this includes position - translation)
+ *      localBBox: 4 numbers box describing the text bounding box, before being transformed by matrix.
+ *      globalBBox: 4 numbers box describing the text bounding box after transoformation, making it the bbox in relation to the page.
+ *      
+ * }
+ */
 function extractText(pdfReader) {
     // 1st phase - extract placements
     var {pagesPlacements,formsPlacements} = extractPlacements(pdfReader,collectPlacements,readResources);
-    // 2nd phase - translate encoded bytes to text strings. mutating the objects!
+    // 2nd phase - translate encoded bytes to text strings.
     var state = {fontDecoders:{}};
     translate(state,pdfReader,pagesPlacements,formsPlacements);
     // 3rd phase - compute dimensions
-    return computeDimensions(state,pdfReader,pagesPlacements,formsPlacements);
-
+    computeDimensions(state,pdfReader,pagesPlacements,formsPlacements);
+    // 4th phase - merge xobject forms
+    pagesPlacements =  mergeForms(pagesPlacements,formsPlacements);
+    // 5th phase - flatten page placments, and simplify constructs
+    return flattenPlacements(pagesPlacements);
 }
 
 module.exports = extractText;

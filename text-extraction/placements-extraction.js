@@ -22,7 +22,8 @@ function parseInterestingResources(resources,pdfReader,readResources) {
                             // got a form!
                             forms[xobjectName] = {
                                 id:  xobjectObjectId,
-                                xobject: xobjectStream
+                                xobject: xobjectStream,
+                                matrix: xobjectDict.exists('Matrix') ? _.map(pdfReader.queryDictionaryObject(xobjectDict,'Matrix').toPDFArray().toJSArray(),item=>item.value):null
                             }
                         }
                     }            
