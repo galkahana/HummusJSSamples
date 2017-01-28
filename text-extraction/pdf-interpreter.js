@@ -4,17 +4,13 @@ function PDFInterpreter() {
 
 }
 
-function toUnsignedCharsArray(charsArray) {
-    return _.map(charsArray,(char)=> {return char < 0 ? (char+256):char})
-}
-
 function debugStream(pdfReader,contentStream) {
     var readStream = pdfReader.startReadingFromStream(contentStream);
     var result = '';
     while(readStream.notEnded())
     {
         var readData = readStream.read(10000);
-        result+=String.fromCharCode.apply(String,toUnsignedCharsArray(readData));
+        result+=String.fromCharCode.apply(String,readData);
     }    
     console.log('stream content',result);
 }
