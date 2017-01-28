@@ -1,0 +1,15 @@
+{
+  "name": "text-extraction",
+  "version": "1.0.0",
+  "description": "",
+  "main": "PDFInterpreter.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "hummus": "^1.0.71",
+    "lodash": "^4.17.4"
+  }
+}
