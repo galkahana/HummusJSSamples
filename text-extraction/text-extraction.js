@@ -5,10 +5,6 @@ var transformations = require('./transformations');
 var CollectionState = require('./collection-state');
 var FontDecoding = require('./font-decoding');
 
-function toUnsignedCharsArray(charsArray) {
-    return _.map(charsArray,(char)=> {return char < 0 ? (char+256):char})
-}
-
 function readResources(resources,pdfReader,result) {
     var extGStates = {};
     var fonts = {};
@@ -217,7 +213,7 @@ function collectPlacements(resources,placements,formsUsed) {
 
             // Text placement operators
             case 'Tj': {
-                textPlacement({asEncodedText:operands[0].value,asBytes:toUnsignedCharsArray(operands[0].toBytesArray())},state,placements);
+                textPlacement({asEncodedText:operands[0].value,asBytes:operands[0].toBytesArray()},state,placements);
                 break;
             }
             case '\'': {
@@ -234,7 +230,7 @@ function collectPlacements(resources,placements,formsUsed) {
                 var params = operands[0].toPDFArray().toJSArray();
                 textPlacement(_.map(params,(item)=>{
                     if(item.getType() === hummus.ePDFObjectLiteralString || item.getType() === hummus.ePDFObjectHexString) 
-                        return {asEncodedText:item.value,asBytes:toUnsignedCharsArray(item.toBytesArray())};
+                        return {asEncodedText:item.value,asBytes:item.toBytesArray()};
                     else
                         return item.value;
                 }),state,placements);
