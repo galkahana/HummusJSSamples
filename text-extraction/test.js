@@ -3,7 +3,7 @@ var _ = require('lodash');
 var extractText = require('./lib/text-extraction');
 
 function runMe() {
-    var fileToRun = './samples/HighLevelContentContext.PDF';
+    var fileToRun = './samples/HighLevelContentContext.pdf';
     var pdfReader = hummus.createReader(fileToRun);
 
     // extract text for all pages
