@@ -383,7 +383,7 @@ function computeDimensions(state,pdfReader,pagesPlacements,formsPlacements) {
 function resolveForm(formObjectId,formsPlacements,resolvedForms) {
     if(!resolvedForms[formObjectId]) {
         resolvedForms[formObjectId] = true;
-        formsPlacements[formObjectId] = resolveFormPlacements(formsPlacements[formObjectId]);
+        formsPlacements[formObjectId] = resolveFormPlacements(formsPlacements[formObjectId],formsPlacements,resolvedForms);
     }
     return formsPlacements[formObjectId];
 }
@@ -402,7 +402,7 @@ function resolveFormPlacements(objectPlacements,formsPlacements,resolvedForms) {
                 // multiply with this placement CTM, and insert at this point
                 clonedPlacemet.text.forEach((textPlacement)=> {
                     var formMatrix = placement.matrix ? transformations.multiplyMatrix(placement.matrix,placement.ctm):placement.ctm;
-                    textPlacement.ctm = transformations.multiplyMatrix(textPlacements.ctm,formMatrix);
+                    textPlacement.ctm = textPlacement.ctm ? transformations.multiplyMatrix(textPlacement.ctm,formMatrix):formMatrix;
                 });
                 newPlacements.push(clonedPlacemet);
             });

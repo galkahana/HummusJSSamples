@@ -85,7 +85,7 @@ function inspectForms(formsToProcess,pdfReader,formsBacklog,collectPlacements,re
         ));
     });
 
-    var newUsedForms = _.filter(formsUsed,(form,formId)=> {
+    var newUsedForms = _.pickBy(formsUsed,(form,formId)=> {
         return !formsBacklog[formId];
     });
     // recurse to new forms
@@ -100,7 +100,6 @@ function extractPlacements(pdfReader,collectPlacements,readResources) {
     var {pagesPlacements,formsUsed} = inspectPages(pdfReader,collectPlacements,readResources);
 
     var formsPlacements = inspectForms(formsUsed,pdfReader,null,collectPlacements,readResources);
-
     return {
         pagesPlacements,
         formsPlacements
