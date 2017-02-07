@@ -5,12 +5,12 @@ var transformations = require('./transformations');
 var CollectionState = require('./collection-state');
 var FontDecoding = require('./font-decoding');
 
-function readResources(resources,pdfReader,result) {
+function readResources(resourcesDicts,pdfReader,result) {
     var extGStates = {};
     var fonts = {};
 
-    if(resources.exists('ExtGState')) {
-        var extGStatesEntry = pdfReader.queryDictionaryObject(resources,'ExtGState');
+    if(resourcesDicts.exists('ExtGState')) {
+        var extGStatesEntry = resourcesDicts.queryDictionaryObject('ExtGState',pdfReader);
         if(!!extGStatesEntry) {
             var extGStatesJS = extGStatesEntry.toPDFDictionary().toJSObject();
             _.forOwn(extGStatesJS,(extGState,extGStateName)=>{
@@ -40,8 +40,8 @@ function readResources(resources,pdfReader,result) {
         }
     } 
 
-    if(resources.exists('Font')) {
-        var fontsEntry = pdfReader.queryDictionaryObject(resources,'Font');
+    if(resourcesDicts.exists('Font')) {
+        var fontsEntry = resourcesDicts.queryDictionaryObject('Font',pdfReader);
         if(!!fontsEntry) {
             var fontsJS = fontsEntry.toPDFDictionary().toJSObject();
             _.forOwn(fontsJS,(fontReference,fontName)=>{

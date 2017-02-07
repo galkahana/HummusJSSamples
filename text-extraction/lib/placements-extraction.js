@@ -1,15 +1,15 @@
 var hummus = require('hummus');
 var _ = require('lodash');
 var PDFInterpreter = require('./pdf-interpreter');
+var MultiDictHelper = require('./multi-dict-helper');
 
-function parseInterestingResources(resources,pdfReader,readResources) {
+function parseInterestingResources(resourcesDicts,pdfReader,readResources) {
     var forms = {};
     var result = {forms};
-    resources = resources.toPDFDictionary();
 
-    if(!!resources) {
-        if(resources.exists('XObject')) {
-            var xobjects = pdfReader.queryDictionaryObject(resources,'XObject');
+    if(!!resourcesDicts) {
+        if(resourcesDicts.exists('XObject')) {
+            var xobjects = resourcesDicts.queryDictionaryObject('XObject',pdfReader);
             if(!!xobjects) {
                 var xobjectsJS = xobjects.toJSObject();
                 _.forOwn(xobjectsJS,(xobjectReference,xobjectName)=>{
@@ -32,7 +32,7 @@ function parseInterestingResources(resources,pdfReader,readResources) {
         }
 
         if(readResources) {
-            readResources(resources,pdfReader,result);
+            readResources(resourcesDicts,pdfReader,result);
         }
     }
 
@@ -42,7 +42,29 @@ function parseInterestingResources(resources,pdfReader,readResources) {
 }
 
 function getResourcesDictionary(anObject,pdfReader) {
-    return anObject.exists('Resources') ? pdfReader.queryDictionaryObject(anObject,'Resources'):null;
+    return anObject.exists('Resources') ? pdfReader.queryDictionaryObject(anObject,'Resources').toPDFDictionary():null;
+}
+
+function getResourcesDictionaries(anObject,pdfReader) {
+    // gets an array of resources dictionaries, going up parents. should
+    // grab 1 for forms, and 1 or more for pages
+    var resourcesDicts = [];
+    while(!!anObject) {
+        var dict = getResourcesDictionary(anObject,pdfReader);
+        if(dict)
+            resourcesDicts.push(dict);
+
+        if(anObject.exists('Parent')) {
+            var parentDict = pdfReader.queryDictionaryObject(anObject,'Parent');
+            if(parentDict.getType() === hummus.ePDFObjectDictionary)
+                anObject = parentDict.toPDFDictionary();
+            else
+                anObject = null;
+        }
+        else
+            anObject = null;
+    }
+    return new MultiDictHelper(resourcesDicts);
 }
 
 function inspectPages(pdfReader,collectPlacements,readResources) {
@@ -57,7 +79,7 @@ function inspectPages(pdfReader,collectPlacements,readResources) {
 
         var interpreter = new PDFInterpreter();
         interpreter.interpretPageContents(pdfReader,pageDictionary,collectPlacements(
-            parseInterestingResources(getResourcesDictionary(pageDictionary,pdfReader),pdfReader,readResources),
+            parseInterestingResources(getResourcesDictionaries(pageDictionary,pdfReader),pdfReader,readResources),
             placements,
             formsUsed
         ));
@@ -79,7 +101,7 @@ function inspectForms(formsToProcess,pdfReader,formsBacklog,collectPlacements,re
     _.forOwn(formsToProcess,(form,formId)=> {
         var interpreter = new PDFInterpreter();
         interpreter.interpretXObjectContents(pdfReader,form,collectPlacements(
-            parseInterestingResources(getResourcesDictionary(form.getDictionary(),pdfReader),pdfReader,readResources),
+            parseInterestingResources(getResourcesDictionaries(form.getDictionary(),pdfReader),pdfReader,readResources),
             formsBacklog[formId],
             formsUsed
         ));
