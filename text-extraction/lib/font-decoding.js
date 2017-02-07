@@ -184,7 +184,7 @@ function parseSimpleFontDimensions(self,pdfReader,font) {
 
         // store widths for specified glyphs
         self.widths = {};
-        for(var i = firstChar; i<=lastChar;++i) {
+        for(var i = firstChar; i<=lastChar && (i-firstChar) < widths.getLength();++i) {
             self.widths[i] = pdfReader.queryArrayObject(widths,i-firstChar).value;
         }
     }

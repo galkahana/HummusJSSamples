@@ -256,9 +256,9 @@ function translateText(pdfReader,textItem,state,item) {
 
 function translatePlacements(state,pdfReader,placements) {
     // iterate the placements, getting the texts and translating them
-    placements.forEach((placement)=> {
+    placements.forEach((placement,index)=> {
         if(placement.type === 'text') {
-            placement.text.forEach((item)=> {
+            placement.text.forEach((item,indexItem)=> {
                 if(_.isArray(item.text)) {
                     // TJ case
 
@@ -293,9 +293,18 @@ function translatePlacements(state,pdfReader,placements) {
     });
 }
 
+
 function translate(state,pdfReader,pagesPlacements,formsPlacements) {
-    pagesPlacements.forEach((placements)=>{translatePlacements(state,pdfReader,placements)});
-    _.forOwn(formsPlacements,(placements,objectId)=>{translatePlacements(state,pdfReader,placements)});
+    pagesPlacements.forEach(
+        (placements,index)=>{
+            translatePlacements(state,pdfReader,placements)
+        }
+    );
+    _.forOwn(formsPlacements,
+        (placements,objectId)=>{
+            translatePlacements(state,pdfReader,placements)
+        }
+    );
 
     return {
         pagesPlacements,
