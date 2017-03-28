@@ -5,12 +5,12 @@ var transformations = require('./transformations');
 var CollectionState = require('./collection-state');
 var FontDecoding = require('./font-decoding');
 
-function readResources(resources,pdfReader,result) {
+function readResources(resourcesDicts,pdfReader,result) {
     var extGStates = {};
     var fonts = {};
 
-    if(resources.exists('ExtGState')) {
-        var extGStatesEntry = pdfReader.queryDictionaryObject(resources,'ExtGState');
+    if(resourcesDicts.exists('ExtGState')) {
+        var extGStatesEntry = resourcesDicts.queryDictionaryObject('ExtGState',pdfReader);
         if(!!extGStatesEntry) {
             var extGStatesJS = extGStatesEntry.toPDFDictionary().toJSObject();
             _.forOwn(extGStatesJS,(extGState,extGStateName)=>{
@@ -40,8 +40,8 @@ function readResources(resources,pdfReader,result) {
         }
     } 
 
-    if(resources.exists('Font')) {
-        var fontsEntry = pdfReader.queryDictionaryObject(resources,'Font');
+    if(resourcesDicts.exists('Font')) {
+        var fontsEntry = resourcesDicts.queryDictionaryObject('Font',pdfReader);
         if(!!fontsEntry) {
             var fontsJS = fontsEntry.toPDFDictionary().toJSObject();
             _.forOwn(fontsJS,(fontReference,fontName)=>{
@@ -256,9 +256,9 @@ function translateText(pdfReader,textItem,state,item) {
 
 function translatePlacements(state,pdfReader,placements) {
     // iterate the placements, getting the texts and translating them
-    placements.forEach((placement)=> {
+    placements.forEach((placement,index)=> {
         if(placement.type === 'text') {
-            placement.text.forEach((item)=> {
+            placement.text.forEach((item,indexItem)=> {
                 if(_.isArray(item.text)) {
                     // TJ case
 
@@ -293,9 +293,18 @@ function translatePlacements(state,pdfReader,placements) {
     });
 }
 
+
 function translate(state,pdfReader,pagesPlacements,formsPlacements) {
-    pagesPlacements.forEach((placements)=>{translatePlacements(state,pdfReader,placements)});
-    _.forOwn(formsPlacements,(placements,objectId)=>{translatePlacements(state,pdfReader,placements)});
+    pagesPlacements.forEach(
+        (placements,index)=>{
+            translatePlacements(state,pdfReader,placements)
+        }
+    );
+    _.forOwn(formsPlacements,
+        (placements,objectId)=>{
+            translatePlacements(state,pdfReader,placements)
+        }
+    );
 
     return {
         pagesPlacements,
@@ -383,7 +392,7 @@ function computeDimensions(state,pdfReader,pagesPlacements,formsPlacements) {
 function resolveForm(formObjectId,formsPlacements,resolvedForms) {
     if(!resolvedForms[formObjectId]) {
         resolvedForms[formObjectId] = true;
-        formsPlacements[formObjectId] = resolveFormPlacements(formsPlacements[formObjectId]);
+        formsPlacements[formObjectId] = resolveFormPlacements(formsPlacements[formObjectId],formsPlacements,resolvedForms);
     }
     return formsPlacements[formObjectId];
 }
@@ -402,7 +411,7 @@ function resolveFormPlacements(objectPlacements,formsPlacements,resolvedForms) {
                 // multiply with this placement CTM, and insert at this point
                 clonedPlacemet.text.forEach((textPlacement)=> {
                     var formMatrix = placement.matrix ? transformations.multiplyMatrix(placement.matrix,placement.ctm):placement.ctm;
-                    textPlacement.ctm = transformations.multiplyMatrix(textPlacements.ctm,formMatrix);
+                    textPlacement.ctm = textPlacement.ctm ? transformations.multiplyMatrix(textPlacement.ctm,formMatrix):formMatrix;
                 });
                 newPlacements.push(clonedPlacemet);
             });
