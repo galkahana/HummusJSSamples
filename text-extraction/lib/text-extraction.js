@@ -18,7 +18,7 @@ function readResources(resources,pdfReader,result) {
                     extGState = pdfReader.parseNewObject(extGState.toPDFIndirectObjectReference().getObjectID()).toPDFDictionary();
                 }
                 else {
-                    extGState = pdfReader.parseNewObject(extGState.toPDFIndirectObjectReference().getObjectID()).toPDFDictionary();
+                    extGState = extGState.toPDFDictionary();
                 }
 
                 if(!!extGState) {
