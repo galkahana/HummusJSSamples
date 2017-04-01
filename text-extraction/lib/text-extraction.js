@@ -128,7 +128,7 @@ function collectPlacements(resources,placements,formsUsed) {
             case 'gs': {
                 if(resources.extGStates[operands[0].value]) {
                     if(resources.extGStates[operands[0].value].font)
-                        state.currentTextState().text.font = _.extend({},resources.extGStates[operands[0].value].font);
+                        state.currentTextState().font = _.extend({},resources.extGStates[operands[0].value].font);
                 }
                 break;
             }
