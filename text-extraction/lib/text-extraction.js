@@ -5,6 +5,9 @@ var transformations = require('./transformations');
 var CollectionState = require('./collection-state');
 var FontDecoding = require('./font-decoding');
 
+// unique id provider for font decoding
+var uniqueId = 0;
+
 function readResources(resourcesDicts,pdfReader,result) {
     var extGStates = {};
     var fonts = {};
@@ -14,7 +17,7 @@ function readResources(resourcesDicts,pdfReader,result) {
         if(!!extGStatesEntry) {
             var extGStatesJS = extGStatesEntry.toPDFDictionary().toJSObject();
             _.forOwn(extGStatesJS,(extGState,extGStateName)=>{
-                if(extGState.getType() === hummus.ePDFIndirectObjectReference) {
+                if(extGState.getType() === hummus.ePDFObjectIndirectObjectReference) {
                     extGState = pdfReader.parseNewObject(extGState.toPDFIndirectObjectReference().getObjectID()).toPDFDictionary();
                 }
                 else {
@@ -45,7 +48,15 @@ function readResources(resourcesDicts,pdfReader,result) {
         if(!!fontsEntry) {
             var fontsJS = fontsEntry.toPDFDictionary().toJSObject();
             _.forOwn(fontsJS,(fontReference,fontName)=>{
-                fonts[fontName] = fontReference.toPDFIndirectObjectReference().getObjectID();
+                var font;
+                if(fontReference.getType() === hummus.ePDFObjectIndirectObjectReference) {
+                    font = {objectId:fontReference.toPDFIndirectObjectReference().getObjectID()};
+                }
+                else {
+                    font = {embeddedObjectId :'embeddedId_'+uniqueId, embeddedObject:fontReference.toPDFDictionary()};
+                    ++uniqueId;
+                }
+                fonts[fontName] = font;
             });
         }
     }    
@@ -89,7 +100,7 @@ function TStar(state) {
 
 function Quote(text,state,placements) {
     TStar(state);
-    textPlacement(text,state,placements);
+    textPlacement({asEncodedText:text.value,asBytes:text.toBytesArray()},state,placements);
 }
 
 function textPlacement(input,state,placements) {
@@ -126,9 +137,10 @@ function collectPlacements(resources,placements,formsUsed) {
             }
 
             case 'gs': {
-                if(resources.extGStates[operands[0].value]) {
-                    if(resources.extGStates[operands[0].value].font)
-                        state.currentTextState().font = _.extend({},resources.extGStates[operands[0].value].font);
+                var gstateName = operands.pop();
+                if(resources.extGStates[gstateName.value]) {
+                    if(resources.extGStates[gstateName.value].font)
+                        state.currentTextState().text.font = _.extend({},resources.extGStates[gstateName.value].font);
                 }
                 break;
             }
@@ -136,8 +148,9 @@ function collectPlacements(resources,placements,formsUsed) {
             // XObject placement
             case 'Do': {
                 // add placement, if form, and mark for later inspection
-                if(resources.forms[operands[0].value]) {
-                    var form = resources.forms[operands[0].value];
+                var formName = operands.pop();
+                if(resources.forms[formName.value]) {
+                    var form = resources.forms[formName.value];
                     placements.push({
                         type:'xobject',
                         objectId:form.id,
@@ -145,37 +158,44 @@ function collectPlacements(resources,placements,formsUsed) {
                         ctm:state.currentGraphicState().ctm.slice()
                     });
                     // add for later inspection (helping the extraction method a bit..[can i factor out? interesting enough?])
-                    formsUsed[resources.forms[operands[0].value].id] = resources.forms[operands[0].value].xobject;
+                    formsUsed[resources.forms[formName.value].id] = resources.forms[formName.value].xobject;
                 }
                 break;
             }
 
             // Text State Operators
             case 'Tc': {
-                Tc(operands[0].value,state);
+                var param = operands.pop();
+                Tc(param.value,state);
                 break;
             }
             case 'Tw': {
-                Tw(operands[0].value,state);
+                var param = operands.pop();
+                Tw(param.value,state);
                 break;
             }
             case 'Tz': {
-                state.currentTextState().scale = operands[0].value;
+                var param = operands.pop();
+                state.currentTextState().scale = param.value;
                 break;
             }
             case 'TL': {
-                TL(operands[0].value,state);
+                var param = operands.pop();
+                TL(param.value,state);
                 break;
             }     
             case 'Ts': {
-                state.currentTextState().rise = operands[0].value;
+                var param = operands.pop();
+                state.currentTextState().rise = param.value;
                 break;
             }     
             case 'Tf': {
-                if(resources.fonts[operands[0].value]) {
+                var size = operands.pop();
+                var fontName = operands.pop();
+                if(resources.fonts[fontName.value]) {
                     state.currentTextState().font = {
-                        reference:resources.fonts[operands[0].value],
-                        size: operands[1].value
+                        reference:resources.fonts[fontName.value],
+                        size: size.value
                     }
                 }
                 break;
@@ -194,12 +214,16 @@ function collectPlacements(resources,placements,formsUsed) {
 
             // Text positioining operators
             case 'Td': {
-                Td(operands[0].value,operands[1].value,state);
+                var param2 = operands.pop();
+                var param1 = operands.pop();
+                Td(param1.value,param2.value,state);
                 break;
             }
             case 'TD': {
-                TL(-operands[1].value,state);
-                Td(operands[0].value,operands[1].value,state);
+                var param2 = operands.pop();
+                var param1 = operands.pop();
+                TL(-param2.value,state);
+                Td(param1.value,param2.value,state);
                 break;
             }
             case 'Tm': {
@@ -213,21 +237,26 @@ function collectPlacements(resources,placements,formsUsed) {
 
             // Text placement operators
             case 'Tj': {
-                textPlacement({asEncodedText:operands[0].value,asBytes:operands[0].toBytesArray()},state,placements);
+                var param = operands.pop();
+                textPlacement({asEncodedText:param.value,asBytes:param.toBytesArray()},state,placements);
                 break;
             }
             case '\'': {
-                Quote(operands[0].value,state,placements);
+                var param = operands.pop();
+                Quote(param,state,placements);
                 break;
             }
             case '"': {
-                 Tw(operands[0].value,state);
-                 Tc(operands[1].value,state);
-                 Quote(operands[2].value,state,placements);
+                var param3 = operands.pop();
+                var param2 = operands.pop();
+                var param1 = operands.pop();
+                 Tw(param1.value,state);
+                 Tc(param2.value,state);
+                 Quote(param3,state,placements);
                 break;
             }
             case 'TJ': {
-                var params = operands[0].toPDFArray().toJSArray();
+                var params = operands.pop().toPDFArray().toJSArray();
                 textPlacement(_.map(params,(item)=>{
                     if(item.getType() === hummus.ePDFObjectLiteralString || item.getType() === hummus.ePDFObjectHexString) 
                         return {asEncodedText:item.value,asBytes:item.toBytesArray()};
@@ -241,10 +270,16 @@ function collectPlacements(resources,placements,formsUsed) {
 }
 
 function fetchFontDecoder(item,pdfReader,state) {
-    if(!state.fontDecoders[item.textState.font.reference]) {
-        state.fontDecoders[item.textState.font.reference] = new FontDecoding(pdfReader,item.textState.font.reference);
+    var fontDescriptor = item.textState.font.reference;
+    var fontReference = item.textState.font.reference.embeddedObjectId || item.textState.font.reference.objectId;
+    if(!state.fontDecoders[fontReference]) {
+        var fontObject = item.textState.font.reference.objectId ? 
+                pdfReader.parseNewObject(item.textState.font.reference.objectId).toPDFDictionary() :
+                item.textState.font.reference.embeddedObject;
+
+        state.fontDecoders[fontReference] = new FontDecoding(pdfReader,fontObject);
     }
-    return state.fontDecoders[item.textState.font.reference];
+    return state.fontDecoders[fontReference];
 }
 
 function translateText(pdfReader,textItem,state,item) {

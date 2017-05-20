@@ -69,7 +69,7 @@ function parseToUnicode(pdfReader,toUnicodeObjectId) {
                 var startCode = beToNum(operands[i].toBytesArray());
                 var endCode = beToNum(operands[i+1].toBytesArray());
                 
-                if(operands[i+2].getType() === hummus.ePDFArray) {
+                if(operands[i+2].getType() === hummus.ePDFObjectArray) {
                     var unicodeArray = operands[i+2].toPDFArray();
                     // specific codes
                     for(var j = startCode;j<=endCode;++j) {
@@ -253,8 +253,8 @@ function parseCIDFontDimensions(self, pdfReader,font) {
 
 
 
-function parseFontData(self,pdfReader,fontObjectId) {
-    var font = pdfReader.parseNewObject(fontObjectId).toPDFDictionary();
+function parseFontData(self,pdfReader,fontObject) {
+    var font = fontObject;
     if(!font)
         return;
 
@@ -320,8 +320,8 @@ function defaultEncoding(bytes) {
 }
 
 
-function FontDecoding(pdfReader,fontObjectId) {
-    parseFontData(this,pdfReader,fontObjectId);
+function FontDecoding(pdfReader,fontObject) {
+    parseFontData(this,pdfReader,fontObject);
 }
 
 FontDecoding.prototype.translate = function(encodedBytes) {

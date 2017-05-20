@@ -12,15 +12,13 @@ function debugStream(pdfReader,contentStream) {
         var readData = readStream.read(10000);
         result+=String.fromCharCode.apply(String,readData);
     }    
-    console.log('stream content',result);
+    console.log('-----------------stream content------------------');
+    console.log(result);
 }
 
-function interpretContentStream(pdfReader,contentStream,onOperatorHandler, operandStackInit) {
-    //debugStream(pdfReader,contentStream);
-    
-    var objectParser = pdfReader.startReadingObjectsFromStream(contentStream);
+function interpretContentStream(objectParser,onOperatorHandler) {
         
-    var operandsStack = operandStackInit || [];
+    var operandsStack = [];
     var anObject = objectParser.parseNewObject();
     
     while(!!anObject) {
@@ -35,7 +33,6 @@ function interpretContentStream(pdfReader,contentStream,onOperatorHandler, opera
         }
         anObject = objectParser.parseNewObject();
     }   
-    return  operandsStack;
 }
 
 PDFInterpreter.prototype.interpretPageContents = function(pdfReader,pageObject,onOperatorHandler) {
@@ -45,24 +42,19 @@ PDFInterpreter.prototype.interpretPageContents = function(pdfReader,pageObject,o
         return;
 
     if(contents.getType() === hummus.ePDFObjectArray) {
-        var contentsArray = contents.toPDFArray();
-        var carriedOperandsStack = [];
-        
-        for(var i=0;i<contentsArray.getLength();++i) {
-            carriedOperandsStack = interpretContentStream(pdfReader,pdfReader.queryArrayObject(contentsArray,i).toPDFStream(),onOperatorHandler,carriedOperandsStack);
-        }
+        interpretContentStream(pdfReader.startReadingObjectsFromStreams(contents.toPDFArray()),onOperatorHandler);
     }
     else {
-        interpretContentStream(pdfReader,contents.toPDFStream(),onOperatorHandler);
+        interpretContentStream(pdfReader.startReadingObjectsFromStream(contents.toPDFStream()),onOperatorHandler);
     }    
 }
 
 PDFInterpreter.prototype.interpretXObjectContents = function(pdfReader,xobjectObject,onOperatorHandler) {
-    interpretContentStream(pdfReader,xobjectObject.toPDFStream(),onOperatorHandler);
+    interpretContentStream(pdfReader.startReadingObjectsFromStream(xobjectObject.toPDFStream()),onOperatorHandler);
 }
 
 PDFInterpreter.prototype.interpretStream = function(pdfReader,stream,onOperatorHandler) {
-    interpretContentStream(pdfReader,stream,onOperatorHandler)
+    interpretContentStream(pdfReader.startReadingObjectsFromStream(stream),onOperatorHandler);
 }
 
 module.exports = PDFInterpreter;
