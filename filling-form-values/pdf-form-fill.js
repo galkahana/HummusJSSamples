@@ -160,10 +160,10 @@ function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inhe
     // and DA is not gonna be useful. so for now let's use as is.
     // For the same reason i'm not support Quad, as well.
     xobjectForm.getContentContext()
-        .writeFreeCode('/Tx BMC')
+        .writeFreeCode('/Tx BMC\r\n')
         .q()
         .BT()
-        .writeFreeCode(da)
+        .writeFreeCode(da + '\r\n')
         .Tj(text,{encoding:'code'})
         .ET()
         .Q()
