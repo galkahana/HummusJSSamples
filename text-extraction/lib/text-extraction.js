@@ -296,21 +296,8 @@ function translatePlacements(state,pdfReader,placements) {
             placement.text.forEach((item,indexItem)=> {
                 if(_.isArray(item.text)) {
                     // TJ case
-
-                    // save all text
-                    var allText = _.reduce(item.text,(result,textItem)=> {
-                        if(textItem.asBytes) {
-                            return result.concat(textItem.asBytes);
-                        }
-                        else
-                            return result;
-                    },[]);
-                    item.allText = {
-                        asBytes : allText
-                    };
-                    translateText(pdfReader,item.allText,state,item);
                     
-                    // also parts
+                    // translated parts
                     item.text.forEach((textItem)=> {
                         if(textItem.asBytes) {
                             // in case it's text and not position change
@@ -318,6 +305,18 @@ function translatePlacements(state,pdfReader,placements) {
                         }
                     });
 
+                    // save all text (concating to bring to attention undefineds as single cases and not have barings on all the string)
+                    item.allText = _.reduce(item.text,(result,textItem)=> {
+                        if(textItem.asBytes) {
+                            return {
+                                asBytes: result.asBytes.concat(textItem.asBytes),
+                                asText: result.asText.concat(textItem.asText.length == 0 ? ' ':textItem.asText),
+                                translationMethod: textItem.translationMethod
+                            }
+                        }
+                        else
+                            return result;
+                    },{asBytes:[],asText:'',translationMethod:null});
                 }
                 else {
                     // Tj case
