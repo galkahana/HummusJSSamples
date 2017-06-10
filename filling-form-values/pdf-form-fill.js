@@ -339,7 +339,7 @@ function updateFieldWithValue(handles,fieldDictionary,value,inheritedProperties)
     }
 }
 
-function writeFieldAndKids(handles,fieldDictionary,inheritedProperties,baseFileName) {
+function writeFieldAndKids(handles,fieldDictionary,inheritedProperties,baseFieldName) {
     // this field or widget doesn't need value rewrite. but its kids might. so write the dictionary as is, dropping kids.
     // write them later and recurse.
 
@@ -363,9 +363,9 @@ function writeFieldAndKids(handles,fieldDictionary,inheritedProperties,baseFileN
         if(fieldDictionary.exists('Opt'))
             localEnv['Opt'] = fieldDictionary.queryObject('Opt').toPDFArray();
 
-        modifiedAcroFormDict.writeKey('Kids');
+        modifiedFieldDict.writeKey('Kids');
         // recurse to kids. note that this will take care of ending this object
-        writeFilledFields(handles,modifiedAcroFormDict,kids,_.extend({},inheritedProperties,localEnv),baseFieldName + localFieldNameT + '.'); 
+        writeFilledFields(handles,modifiedFieldDict,kids,_.extend({},inheritedProperties,localEnv),baseFieldName + '.'); 
     } else {
         // no kids, can finish object now
         handles.objectsContext
@@ -380,7 +380,7 @@ function writeFieldAndKids(handles,fieldDictionary,inheritedProperties,baseFileN
  */
 function writeFilledField(handles,fieldDictionary,inheritedProperties,baseFieldName) {
     var localFieldNameT = fieldDictionary.exists('T') ? toText(fieldDictionary.queryObject('T')):undefined,
-        fullName = localFieldNameT === undefined ? undefined : (baseFieldName + localFieldNameT);
+        fullName = localFieldNameT === undefined ? baseFieldName : (baseFieldName + localFieldNameT);
 
     // Based on the fullName we can now determine whether the field has a value that needs setting
     if(handles.data[fullName]) {
@@ -389,7 +389,7 @@ function writeFilledField(handles,fieldDictionary,inheritedProperties,baseFieldN
     }  
     else {
         // Not yet. write and recurse to kids
-        writeFieldAndKids(handles,fieldDictionary,inheritedProperties,baseFieldName);
+        writeFieldAndKids(handles,fieldDictionary,inheritedProperties,fullName);
     }
 }
 
