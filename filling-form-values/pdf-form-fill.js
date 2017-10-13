@@ -131,6 +131,35 @@ function updateOptionButtonValue(handles,fieldDictionary,value) {
     }
 }
 
+function getOriginalTextFieldAppearanceStreamCode(handles, fieldDictionary) {
+    // get the single appearance stream for the text, field. we'll use it to recreate the new one
+    var appearanceInField =  fieldDictionary.exists('Subtype') && (fieldDictionary.queryObject('Subtype').toString() == 'Widget') || !fieldDictionary.exists('Kids');
+    var appearanceParent = null;
+    if(appearanceInField) {
+        appearanceParent = fieldDictionary;
+    }
+    else {
+        if(fieldDictionary.exists('Kids')) {
+            var kidsArray = handles.reader.queryDictionaryObject(fieldDictionary,'Kids').toPDFArray();
+            if(kidsArray.getLength() > 0) {
+                appearanceParent = handles.reader.queryArrayObject(0).toPDFDictionary();
+            }
+        }
+    }
+    
+    if(!appearanceParent)
+        return null;
+
+    if(!appearanceParent.exists('AP'))
+        return null;
+    var appearance = handles.reader.queryDictionaryObject(appearanceParent,'AP').toPDFDictionary();
+    if(!appearance.exists('N'))
+        return null;
+
+    var appearanceXObject = handles.reader.queryDictionaryObject(appearance,'N').toPDFStream();
+    return readStreamToString(handles,appearanceXObject);
+}
+
 function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inheritedProperties) {
     var rect = handles.reader.queryDictionaryObject(fieldsDictionary,'Rect').toPDFArray().toJSArray();
     da = fieldsDictionary.exists('DA') ? fieldsDictionary.queryObject('DA').toString():inheritedProperties('DA');
@@ -149,17 +178,35 @@ function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inhe
         });
     }
 
+    var originalAppearanceContent = getOriginalTextFieldAppearanceStreamCode(handles,fieldsDictionary);
+    var before = '';
+    var after = '';
+    
+    if(!!originalAppearanceContent) {
+        var pre = originalAppearanceContent.indexOf('/Tx BMC')
+        if(pre !== -1) {
+            before = originalAppearanceContent.substr(0,pre);
+            post = originalAppearanceContent.indexOf('EMC',pre + '/Tx BMC'.length)
+            if(post !== -1) {
+                after = originalAppearanceContent.substr(post + 'EMC'.length)
+            }
+        }
+        else {
+            before = originalAppearanceContent;
+        }
+    }
+
     var xobjectForm = handles.writer.createFormXObject(
                         0, 
                         0, 
                         rect[2].value - rect[0].value, 
                         rect[3].value - rect[1].value,
                         formId);
-
     // Will use Tj with "code" encoding to write the text, assuming encoding should work (??). if it won't i need real fonts here
     // and DA is not gonna be useful. so for now let's use as is.
     // For the same reason i'm not support Quad, as well.
     xobjectForm.getContentContext()
+        .writeFreeCode(before)
         .writeFreeCode('/Tx BMC\r\n')
         .q()
         .BT()
@@ -168,7 +215,22 @@ function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inhe
         .ET()
         .Q()
         .writeFreeCode('EMC')
-    handles.writer.endFormXObject(xobjectForm);
+        .writeFreeCode(after);
+
+        handles.writer.endFormXObject(xobjectForm);
+}
+
+var BUFFER_SIZE = 10000;
+function readStreamToString(handles,stream) {
+    var buff = '';
+    var readStream = handles.reader.startReadingFromStream(stream);
+    while(readStream.notEnded())
+    {
+      var readData = readStream.read(BUFFER_SIZE);
+      buff+= _.reduce(readData,function(acc,item){ return acc + String.fromCharCode(item)},'');
+    }
+
+    return buff;
 }
 
 function writeFieldWithAppearanceForText(handles,targetFieldDict,sourceFieldDictionary,appearanceInField,textToWrite,inheritedProperties) {
