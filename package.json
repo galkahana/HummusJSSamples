@@ -2,7 +2,7 @@
   "name": "text-extraction",
   "version": "1.0.0",
   "description": "",
-  "main": "PDFInterpreter.js",
+  "main": "./lib/text-extraction.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
@@ -11,5 +11,8 @@
   "dependencies": {
     "hummus": "^1.0.77",
     "lodash": "^4.17.4"
+  },
+  "devDependencies": {
+    "git-release": "^0.6.0"
   }
 }
