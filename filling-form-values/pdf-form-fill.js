@@ -133,7 +133,7 @@ function updateOptionButtonValue(handles,fieldDictionary,value) {
 
 function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inheritedProperties) {
     var rect = handles.reader.queryDictionaryObject(fieldsDictionary,'Rect').toPDFArray().toJSArray();
-    da = fieldsDictionary.exists('DA') ? fieldsDictionary.queryObject('DA').toString():inheritedProperties('DA');
+    da = fieldsDictionary.exists('DA') ? fieldsDictionary.queryObject('DA').toString():inheritedProperties['DA'];
 
     // register to copy resources from form default resources dict [would have been better to just refer to it...but alas don't have access for xobject resources dict]
     if(handles.acroformDict.exists('DR')) {
