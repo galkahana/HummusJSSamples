@@ -91,6 +91,9 @@ function updateOptionButtonValue(handles,fieldDictionary,value) {
         modifiedDict
             .writeKey('V')
             .writeNameValue(appearanceName);
+	    
+	// write the Kids key before we write the kids array
+	modifiedDict.writeKey('Kids')
 
         // write the kids array, similar to writeFilledFields, but knowing that these are widgets and that AS needs to be set
         var fieldsReferences = writeKidsAndEndObject(handles,modifiedDict,kidsArray);
