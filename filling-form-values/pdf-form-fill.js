@@ -74,7 +74,7 @@ function updateOptionButtonValue(handles,fieldDictionary,value) {
         // Field. this would mean that there's a kid array, and there are offs and ons to set
         var modifiedDict = startModifiedDictionary(handles,fieldDictionary,{'V':-1,'Kids':-1});
         var kidsArray = handles.reader.queryDictionaryObject(fieldDictionary,'Kids').toPDFArray();
-        var appearaneName;
+        var appearanceName;
         if(value === null) {
             // false is easy, just write '/Off' as the value and as the appearance stream
             appearanceName = 'Off';
@@ -91,6 +91,9 @@ function updateOptionButtonValue(handles,fieldDictionary,value) {
         modifiedDict
             .writeKey('V')
             .writeNameValue(appearanceName);
+	    
+	// write the Kids key before we write the kids array
+	modifiedDict.writeKey('Kids')
 
         // write the kids array, similar to writeFilledFields, but knowing that these are widgets and that AS needs to be set
         var fieldsReferences = writeKidsAndEndObject(handles,modifiedDict,kidsArray);
