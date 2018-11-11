@@ -74,7 +74,7 @@ function updateOptionButtonValue(handles,fieldDictionary,value) {
         // Field. this would mean that there's a kid array, and there are offs and ons to set
         var modifiedDict = startModifiedDictionary(handles,fieldDictionary,{'V':-1,'Kids':-1});
         var kidsArray = handles.reader.queryDictionaryObject(fieldDictionary,'Kids').toPDFArray();
-        var appearaneName;
+        var appearanceName;
         if(value === null) {
             // false is easy, just write '/Off' as the value and as the appearance stream
             appearanceName = 'Off';
@@ -91,6 +91,9 @@ function updateOptionButtonValue(handles,fieldDictionary,value) {
         modifiedDict
             .writeKey('V')
             .writeNameValue(appearanceName);
+	    
+	// write the Kids key before we write the kids array
+	modifiedDict.writeKey('Kids')
 
         // write the kids array, similar to writeFilledFields, but knowing that these are widgets and that AS needs to be set
         var fieldsReferences = writeKidsAndEndObject(handles,modifiedDict,kidsArray);
@@ -162,7 +165,7 @@ function getOriginalTextFieldAppearanceStreamCode(handles, fieldDictionary) {
 
 function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inheritedProperties) {
     var rect = handles.reader.queryDictionaryObject(fieldsDictionary,'Rect').toPDFArray().toJSArray();
-    da = fieldsDictionary.exists('DA') ? fieldsDictionary.queryObject('DA').toString():inheritedProperties('DA');
+    da = fieldsDictionary.exists('DA') ? fieldsDictionary.queryObject('DA').toString():inheritedProperties['DA'];
 
     // register to copy resources from form default resources dict [would have been better to just refer to it...but alas don't have access for xobject resources dict]
     if(handles.acroformDict.exists('DR')) {
