@@ -166,6 +166,16 @@ function getOriginalTextFieldAppearanceStreamCode(handles, fieldDictionary) {
 function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inheritedProperties) {
     var rect = handles.reader.queryDictionaryObject(fieldsDictionary,'Rect').toPDFArray().toJSArray();
     da = fieldsDictionary.exists('DA') ? fieldsDictionary.queryObject('DA').toString():inheritedProperties['DA'];
+    q = fieldsDictionary.exists('Q') ? fieldsDictionary.queryObject('Q').toNumber():inheritedProperties['Q'];
+
+    if(handles.options.debug) {
+        console.debug('creating new appearance with:')
+        console.debug('da =', da)
+        console.debug('q =', q)
+        console.debug('fieldsDictionary =', fieldsDictionary.toJSObject())
+        console.debug('inheritedProperties =', inheritedProperties)
+        console.debug('text =', text)
+    }
 
     // register to copy resources from form default resources dict [would have been better to just refer to it...but alas don't have access for xobject resources dict]
     if(handles.acroformDict.exists('DR')) {
@@ -199,16 +209,60 @@ function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inhe
         }
     }
 
+    var boxWidth = rect[2].value - rect[0].value
+    var boxHeight = rect[3].value - rect[1].value;
+
     var xobjectForm = handles.writer.createFormXObject(
                         0, 
                         0, 
-                        rect[2].value - rect[0].value, 
-                        rect[3].value - rect[1].value,
+                        boxWidth, 
+                        boxHeight,
                         formId);
-    // Will use Tj with "code" encoding to write the text, assuming encoding should work (??). if it won't i need real fonts here
+    
+    // If default text options setup, use them to determine the text appearance. including quad support, horizontal centering etc.
+    // Otherwise, use naive method: Will use Tj with "code" encoding to write the text, assuming encoding should work (??). if it won't i need real fonts here
     // and DA is not gonna be useful. so for now let's use as is.
-    // For the same reason i'm not support Quad, as well.
-    xobjectForm.getContentContext()
+    // For the same reason i'm not support Quad, as well
+
+    // Should be able to parse the following from the DA, and map to system font
+    // temporarily, let user input the values
+    var textOptions = handles.options.defaultTextOptions
+
+    if(textOptions) {
+        // grab text dimensions for quad support and vertical centering
+        var textDimensions = textOptions.font.calculateTextDimensions(text,textOptions.size);
+
+        // vertical centering
+        var yPos = (boxHeight-textDimensions.height)/2
+        // horizontal pos per quad
+        var quad = q || 0
+
+        var xPos = 0
+        switch(quad) {
+            case 0:
+                // left align
+                xPos = 0
+                break;
+            case 1:
+                // center
+                xPos = (boxWidth-textDimensions.width)/2
+                break;
+            case 2:
+                // right align
+                xPos = (boxWidth-textDimensions.width)
+        }
+
+        xobjectForm.getContentContext()
+            .writeFreeCode(before)
+            .writeFreeCode('/Tx BMC\r\n')
+            .q()
+            .writeText(text,xPos,yPos,textOptions)
+            .Q()
+            .writeFreeCode('EMC')
+            .writeFreeCode(after);
+    } else {
+        // Naive form, no quad support...and text may not show and may be mispositioned
+        xobjectForm.getContentContext()
         .writeFreeCode(before)
         .writeFreeCode('/Tx BMC\r\n')
         .q()
@@ -219,8 +273,9 @@ function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inhe
         .Q()
         .writeFreeCode('EMC')
         .writeFreeCode(after);
+    }
 
-        handles.writer.endFormXObject(xobjectForm);
+    handles.writer.endFormXObject(xobjectForm);
 }
 
 var BUFFER_SIZE = 10000;
@@ -425,6 +480,8 @@ function writeFieldAndKids(handles,fieldDictionary,inheritedProperties,baseField
             localEnv['Ff'] = fieldDictionary.queryObject('Ff').toNumber();
         if(fieldDictionary.exists('DA'))
             localEnv['DA'] = fieldDictionary.queryObject('DA').toString();
+            if(fieldDictionary.exists('Q'))
+            localEnv['Q'] = fieldDictionary.queryObject('Q').toNumber();
         if(fieldDictionary.exists('Opt'))
             localEnv['Opt'] = fieldDictionary.queryObject('Opt').toPDFArray();
 
@@ -528,7 +585,7 @@ function writeFilledForm(handles,acroformDict) {
     }
 }
 
-function fillForm(writer,data) {
+function fillForm(writer,data, options) {
     // setup parser
     var reader =  writer.getModifiedFileParser();
 
@@ -553,7 +610,8 @@ function fillForm(writer,data) {
         copyingContext:copyingContext,
         objectsContext:objectsContext,
         data:data,
-        acroformDict:acroformDict
+        acroformDict:acroformDict,
+        options:options || {}
     };
 
     // recreate a copy of the existing form, which we will fill with data. 
