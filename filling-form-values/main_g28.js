@@ -3,6 +3,7 @@ var hummus = require('hummus'),
 
     var writer = hummus.createWriterToModify(__dirname + '/sample-forms/g-28.pdf', {
             modifiedFilePath: __dirname + '/output/g-28-filled.pdf',
+            log: __dirname + '/output/g-28-filled.log'
 		});
 
     var data = {
@@ -16,6 +17,6 @@ var hummus = require('hummus'),
             colorspace: 'gray',
             color: 0,
         },
-        debug:true
+        debug:false
     });
     writer.end();

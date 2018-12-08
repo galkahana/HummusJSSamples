@@ -177,20 +177,6 @@ function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inhe
         console.debug('text =', text)
     }
 
-    // register to copy resources from form default resources dict [would have been better to just refer to it...but alas don't have access for xobject resources dict]
-    if(handles.acroformDict.exists('DR')) {
-        handles.writer.getEvents().once('OnResourcesWrite',function(args){
-            // copy all but the keys that exist already
-            var dr = handles.reader.queryDictionaryObject(handles.acroformDict,'DR').toPDFDictionary().toJSObject();
-                Object.getOwnPropertyNames(dr).forEach(function(element,index,array) {
-                    if (element !== 'ProcSet') {
-                        args.pageResourcesDictionaryContext.writeKey(element);
-                        handles.copyingContext.copyDirectObjectAsIs(dr[element]);
-                    }
-                });
-        });
-    }
-
     var originalAppearanceContent = getOriginalTextFieldAppearanceStreamCode(handles,fieldsDictionary);
     var before = '';
     var after = '';
@@ -273,6 +259,22 @@ function writeAppearanceXObjectForText(handles,formId,fieldsDictionary,text,inhe
         .Q()
         .writeFreeCode('EMC')
         .writeFreeCode(after);
+    }
+
+    // register to copy resources from form default resources dict [would have been better to just refer to it...
+    // but alas don't have access for xobject resources dict]. 
+    // Later note: well, we do need to add the fonts on occasion...
+    if(handles.acroformDict.exists('DR')) {
+        handles.writer.getEvents().once('OnResourcesWrite',function(args){
+            // copy all but the keys that exist already
+            var dr = handles.reader.queryDictionaryObject(handles.acroformDict,'DR').toPDFDictionary().toJSObject();
+                Object.getOwnPropertyNames(dr).forEach(function(element,index,array) {
+                    if (element !== 'ProcSet' && (!textOptions || element !== 'Font')) {
+                        args.pageResourcesDictionaryContext.writeKey(element);
+                        handles.copyingContext.copyDirectObjectAsIs(dr[element]);
+                    }
+                });
+        });
     }
 
     handles.writer.endFormXObject(xobjectForm);
