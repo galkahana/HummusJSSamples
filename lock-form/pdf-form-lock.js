@@ -263,7 +263,6 @@ function lockWidgetAnnotationsForPage(handles,pageObjectId,pageDictionary,widget
     var preStreamCxt = objectsContext.startPDFStream();
     writeToStreamCxt(preStreamCxt,"q\r\n");
     objectsContext.endPDFStream(preStreamCxt);
-    objectsContext.endIndirectObject();
 
     // now the 2nd one, iterate the widget annotations, write the forms
     objectsContext.startNewIndirectObject(postContent);
@@ -278,7 +277,6 @@ function lockWidgetAnnotationsForPage(handles,pageObjectId,pageDictionary,widget
         writeToStreamCxt(postStreamCxt,"Q\r\n");
     });
     objectsContext.endPDFStream(postStreamCxt);
-    objectsContext.endIndirectObject();
 }
 
 var BUFFER_SIZE = 10000;
@@ -308,7 +306,6 @@ function convertWidgetAnnotationsToForm(handles,widgetAnnoations) {
             }
                 
             objectsContext.endPDFStream(streamCxt);
-            objectsContext.endIndirectObject();
         }
 
 

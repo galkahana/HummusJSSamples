@@ -49,13 +49,11 @@ function writeFilledForm(handles,acroformDict) {
             } 
         }    
             
-        console.log('dataSetsObjectStreamId',dataSetsObjectStreamId)
         if(dataSetsObjectStreamId) {
             // k. let's do something about it. modify the stream to updated values
             var PDFDigitalForm = require('../parsing-form-values/pdf-digital-form')
             var digitalForm = new PDFDigitalForm(handles.reader);
             fs.writeFile(__dirname + '/output/test.json',JSON.stringify(digitalForm.fields,null,2),{encoding:'utf8'},()=>{});
-            console.log('digitalForm.fields',digitalForm.fields)
             fs.writeFile(__dirname + '/output/testShort.json',JSON.stringify(digitalForm.createSimpleKeyValue(),null,2),{encoding:'utf8'},()=>{});
 
             handles.objectsContext.startModifiedIndirectObject(dataSetsObjectStreamId);
@@ -66,7 +64,6 @@ function writeFilledForm(handles,acroformDict) {
 
             writeToStreamCxt(dataSetStream,"</xfa:data\n></xfa:datasets\n>");
             handles.objectsContext.endPDFStream(dataSetStream);
-            handles.objectsContext.endIndirectObject();
         }
     }
 }
