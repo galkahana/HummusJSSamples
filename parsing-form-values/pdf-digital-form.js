@@ -104,7 +104,7 @@ function parseTextFieldValue(pdfParser, fieldDictionary,fieldName) {
 	} else if(valueField.getType() == hummus.ePDFObjectStream) {
 		var bytes = [];
 		// stream. read it into the value
-		var readStream = pdfParser.startReadingFromStream(valueField.toPDFStream());
+		var readStream = pdfReader.startReadingFromStream(valueField.toPDFStream());
 		while(readStream.notEnded())
 		{
 		  var readData = readStream.read(1);
@@ -112,7 +112,7 @@ function parseTextFieldValue(pdfParser, fieldDictionary,fieldName) {
 		  bytes.push(readData[0]);
 		}
 		// now turn to text string
-		return new hummus.PDFTextString(bytes).toString();
+		return new PDFTextString(bytes).toString();
 	} else {
 		return null;
 	}
